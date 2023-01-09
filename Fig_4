@@ -1,1 +1,910 @@
+Fig_4A = 0; % macrophage PCA colored by cluster and heatmap of cluster genes
+Fig_4B = 0; % Y chromosome gene expression
+Fig_4C = 0; % fetal score
+Fig_4D = 0; % WT fetal gene enrichment
+Fig_4E = 0; % WT fetal gene across time points
+Fig_4F = 0; % maternal macrophage PCA
+Fig_4G = 0; % maternal PC1 genes enrichment and heatmap
 
+if Fig_4A
+%% load data
+load prepare_the_data/in_vivo_E/TP1_macs_raw.mat
+load prepare_the_data/in_vivo_E/TP2_macs_raw.mat
+load prepare_the_data/in_vivo_E/TP3_macs_raw.mat
+load prepare_the_data/in_vivo_E/TP4_macs_raw.mat
+
+load prepare_the_data/in_vivo_E/gene_names_correct.mat
+load prepare_the_data/in_vivo_E/Y_chr_genes.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+load prepare_the_data/cmap_color_blind.mat
+%% remove HB genes from each
+hb_genes = {'Hbb-bs','Hbb-bt','Hba-a1','Hba-a2'};
+hb_ind = ismember(gene_names_correct,hb_genes);
+
+genes_no_hb = gene_names_correct(~hb_ind);
+
+% TP4
+TP4_raw_nhb = TP4_macs_raw(~hb_ind,:);
+m4_tpm_nhb = median(sum(TP4_raw_nhb))*bsxfun(@rdivide,TP4_raw_nhb,sum(TP4_raw_nhb));
+m4_log_nhb = log10(1+m4_tpm_nhb);
+
+% TP3
+TP3_raw_nhb = TP3_macs_raw(~hb_ind,:);
+m3_tpm_nhb = median(sum(TP3_raw_nhb))*bsxfun(@rdivide,TP3_raw_nhb,sum(TP3_raw_nhb));
+m3_log_nhb = log10(1+m3_tpm_nhb);
+
+% TP2
+TP2_raw_nhb = TP2_macs_raw(~hb_ind,:);
+m2_tpm_nhb = median(sum(TP2_raw_nhb))*bsxfun(@rdivide,TP2_raw_nhb,sum(TP2_raw_nhb));
+m2_log_nhb = log10(1+m2_tpm_nhb);
+
+% TP1
+TP1_raw_nhb = TP1_macs_raw(~hb_ind,:);
+m1_tpm_nhb = median(sum(TP1_raw_nhb))*bsxfun(@rdivide,TP1_raw_nhb,sum(TP1_raw_nhb));
+m1_log_nhb = log10(1+m1_tpm_nhb);
+%% save new Figure 4 data
+save Fig4_data.mat genes_no_hb m4_tpm_nhb m4_log_nhb m3_tpm_nhb m3_log_nhb m2_tpm_nhb m2_log_nhb...
+     m1_tpm_nhb m1_log_nhb;
+%% PCA on 72h macrophages, colored by cluster and heatmap of DE genes
+% info genes PCA
+[info_genes_m4,info_genes_names_m4] = info_genes(m4_tpm_nhb,2,2,genes_no_hb);%1021
+[coeff,score,~,~,explained,~] = pca(m4_log_nhb(info_genes_m4,:)');
+
+% define fetal cells in order to cluster
+Y_chr_ind = ismember(genes_no_hb,Y_chr_genes);
+fetal4 = sum(m4_log_nhb(Y_chr_ind,:))>0;
+
+% define fetal DE genes 
+fetal_vec_2 = fetal4 + 1;
+[DE_genes_m4,DE_genes_pvals_m4,DE_genes_names_m4] = DE_genes_pvals(m4_tpm_nhb,fetal_vec_2,genes_no_hb,0.0001);
+
+% first 23 genes are sig maternal and all of the fetal are 
+mat_fet4 = DE_genes_names_m4(1:23,:);
+top_list = mat_fet4(:); fetal4_DE_list_ind = ismember(genes_no_hb,top_list);
+
+% cluster based on the fetal and maternal genes and THEN define new genes
+% based on these 2 clusters
+m4_clust_b = cluster((linkage(pdist(m4_log_nhb(fetal4_DE_list_ind,:)'),'ward')),2);
+% 2 is maternal, 1 is fetal
+
+r = randperm(length(m4_clust_b));
+
+figure;
+subplot(2,2,1);
+scatter(score(r,1),score(r,2),10,m4_clust_b(r),'filled');
+colormap(vertcat(s4(4,:),s4(2,:)));
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_4A_PCA.pdf'
+
+% for legend
+figure;
+gscatter(score(:,1),score(:,2),m4_clust_b,vertcat(s4(4,:),s4(2,:)),'.',10);
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_4A_PCA_legend.pdf'
+%% DE genes between clusters and heatmap
+[DE_genes_m4b,DE_genes_pvals_m4b,DE_genes_names_m4b] = DE_genes_pvals(m4_tpm_nhb,m4_clust_b,genes_no_hb,0.0001);
+
+top_genes = DE_genes_m4b(1:10,:);
+top_genes_ind = top_genes(:);
+
+top_genes_ind_names = genes_no_hb(top_genes_ind);
+[i,xi] = sort(m4_clust_b,'ascend');
+
+mat = m4_tpm_nhb(top_genes_ind,:);
+mat_z = zscore(mat,0,2);
+
+x1 = max(find(m4_clust_b(xi) ==1))
+
+figure;
+subplot(10,1,1:9);
+imagesc(mat_z(:,xi));
+caxis([-2 2]);
+colormap(gca,cmap_color_blind);
+xline(x1,'k','Linewidth',1.5); 
+yline(10.5,'k','Linewidth',1.5);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(top_genes_ind_names));set(gca,'yticklabel',top_genes_ind_names);
+subplot(10,1,10);
+imagesc(m4_clust_b(xi)');
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(gca,vertcat(s4(4,:),s4(2,:)));
+
+print -painters -depsc 'Fig_4A_heatmap.pdf'
+%% save Fig_4a PCA data
+coeff_m = coeff;
+score_m = score;
+save Fig_4A_data.mat genes_no_hb DE_genes_m4b ...
+info_genes_m4 info_genes_names_m4 coeff_m score_m fetal4 fetal_vec_2 m4_clust_b;
+end
+
+if Fig_4B
+%% load data
+load Fig4_data.mat
+load Fig_4A_data.mat
+load prepare_the_data/in_vivo_E/Y_chr_genes.mat
+%% fetal colors
+c1a = brewermap(8,'Pastel2');c1 = c1a(8,:);
+c2a = brewermap(9,'PuOr');c2 = c2a(8,:);
+fetal_colors = vertcat(c1,c2);
+%% PCA colored by fetal cells
+figure;
+subplot(2,2,1);
+gscatter(score_m(:,1),score_m(:,2),fetal_vec_2,fetal_colors,'.',20);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_4B_fetal_PCA.pdf'
+%% histogram of fetal cells by PC 1 scores
+% PC 1 scores
+pc1_scores = score_m(:,1);
+
+Y_chr_ind = ismember(genes_no_hb,Y_chr_genes);
+fetal = sum(m4_log_nhb(Y_chr_ind,:))>0;
+non_fetal = sum(m4_log_nhb(Y_chr_ind,:))<=0;
+
+h1_nf = histc(pc1_scores(non_fetal),-10:1:10);
+h1_f = histc(pc1_scores(fetal),-10:1:10);
+
+% normalize 
+f = h1_f./sum(h1_f);
+nf = h1_nf./sum(h1_nf);
+
+figure;
+hb = bar([nf,f],2.5);
+hb(1).FaceColor = fetal_colors(1,:);
+hb(2).FaceColor = fetal_colors(2,:);
+% set(gca,'ytick',[]);
+ylim([0 0.2]);
+set(gca,'xtick',[]);
+set(gca,'ytick',[]);
+print -painters -depsc 'Fig_4B_histogram.pdf'
+end
+
+if Fig_4C
+%% load data    
+load Fig4_data.mat
+load Fig_4A_data.mat 
+load prepare_the_data/in_vivo_E/Y_chr_genes.mat
+%% Fig 4C: PCA colored by correlation with fetal profile
+% assign fetal vs maternal cluster
+f_clust = m4_clust_b == 1;
+m_clust = m4_clust_b == 2;
+
+Y_chr_ind = ismember(genes_no_hb,Y_chr_genes);
+Y_chr_genes_in_use = genes_no_hb(Y_chr_ind)
+save Y_chr_genes_in_use.mat Y_chr_genes_in_use
+% defines all the cells that express any fetal genes (male fetal cells)
+fetal_xy = sum(m4_log_nhb(Y_chr_ind,:))>0;
+
+
+% try correlation on all DE genes
+genes_list = DE_genes_m4b(:);
+
+fetal_xy_avg_prof = mean(m4_log_nhb(genes_list,fetal_xy),2);
+
+c_vec = NaN(1,length(m4_clust_b));
+for f = 1:length(m4_clust_b)
+    cell_profile = m4_log_nhb(genes_list,f);
+    c = corrcoef(fetal_xy_avg_prof,cell_profile);
+    c_vec(f) = c(1,2);
+end
+
+figure;
+scatter(score_m(:,1),score_m(:,2),40,c_vec,'filled');
+set(gca,'visible','off');
+colormap((cmocean('ice')));
+cb = colorbar; 
+set(cb,'position', [0.9 0.08 0.03 0.1]);
+
+print -painters -depsc 'Fig_4C_correlation.pdf'
+end
+
+if Fig_4D
+%% load data    
+load prepare_the_data/in_vivo_E/GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X
+load Fig4_data.mat 
+load Fig_4A_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct.mat
+
+load prepare_the_data/in_vivo_E/TP1_nm.mat TP1_macs_tx_vec
+load prepare_the_data/in_vivo_E/TP2_nm.mat TP2_macs_tx_vec
+load prepare_the_data/in_vivo_E/TP3_nm.mat TP3_macs_tx_vec
+load prepare_the_data/in_vivo_E/TP4_nm.mat TP4_macs_tx_vec
+
+load prepare_the_data/in_vivo_E/tx_colors.mat
+load prepare_the_data/in_vivo_E/Y_chr_genes.mat
+%% [define fetal vs maternal macrophages at each time point] 
+m4mb = m4_clust_b == 2;
+m4fb = m4_clust_b == 1;
+
+% maternal
+m4mb_tpm = m4_tpm_nhb(:,m4mb);
+m4mb_log = m4_log_nhb(:,m4mb);
+m4mb_vec = TP4_macs_tx_vec(m4mb);
+
+%fetal
+m4fb_tpm = m4_tpm_nhb(:,m4fb);
+m4fb_log = m4_log_nhb(:,m4fb);
+m4fb_vec = TP4_macs_tx_vec(m4fb);
+
+% TP3 define fetal signature including sham
+tx_label = {'Sham','KO','WT'};
+Y_chr_ind = ismember(genes_no_hb,Y_chr_genes);
+[info_genes_m3,info_genes_names_m3] = info_genes(m3_tpm_nhb,2,2,genes_no_hb);%630
+
+[coeff,score,~,~,explained,~] = pca(m3_log_nhb(info_genes_m3,:)');
+figure;gscatter(score(:,1),score(:,2),TP3_macs_tx_vec,tx_colors,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+legend(tx_label);
+
+% define fetal cells and look at where they are in PCA
+fetal3 = sum(m3_log_nhb(Y_chr_ind,:))>0;
+
+figure;
+subplot(2,2,1);
+scatter(score(:,1),score(:,2),30,sum(m3_log_nhb(Y_chr_ind,:)),'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('Y chromosomone gene expression');
+subplot(2,2,2);
+scatter(score(:,1),score(:,2),20,fetal3,'filled');
+colormap(gca,flip(brewermap(2,'Set1')));
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('fetal');
+
+% fetal DE
+fetal_vec_2 = fetal3 + 1;
+[DE_genes_m3,DE_genes_pvals_m3,DE_genes_names_m3] = DE_genes_pvals(m3_tpm_nhb,fetal_vec_2,genes_no_hb,0.0001);
+
+% first 49 genes are sig maternal and all of the fetal are 
+mat_fet3 = DE_genes_names_m3(1:49,:);
+top_list = mat_fet3(:);
+fetal3_DE_list_ind = ismember(genes_no_hb,top_list);
+
+%cluster based on fetal DE and redefine
+m3_clust_b = cluster((linkage(pdist(m3_log_nhb(fetal3_DE_list_ind,:)'),'ward')),2);
+
+figure;gscatter(score(:,1),score(:,2),m3_clust_b,s4,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+% [DE_genes_m3b,DE_genes_pvals_m3b,DE_genes_names_m3b] = DE_genes_pvals(m3_tpm_nhb,m3_clust_b,genes_no_hb,0.0001);
+
+% 2 is maternal, 1 is fetal
+% mat_fet3b = DE_genes_names_m3b;
+
+m3mb = m3_clust_b == 2;
+m3fb = m3_clust_b == 1;
+
+% maternal
+m3mb_tpm = m3_tpm_nhb(:,m3mb);
+m3mb_log = m3_log_nhb(:,m3mb);
+m3mb_vec = TP3_macs_tx_vec(m3mb);
+
+%fetal
+m3fb_tpm = m3_tpm_nhb(:,m3fb);
+m3fb_log = m3_log_nhb(:,m3fb);
+m3fb_vec = TP3_macs_tx_vec(m3fb);
+
+% TP2 define fetal signature including sham
+[info_genes_m2,info_genes_names_m2] = info_genes(m2_tpm_nhb,2,2,genes_no_hb);%760
+
+[coeff,score,~,~,explained,~] = pca(m2_log_nhb(info_genes_m2,:)');
+figure;gscatter(score(:,1),score(:,2),TP2_macs_tx_vec,tx_colors,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+legend(tx_label);
+
+
+%  define fetal cells and look at where they are in PCA
+fetal2 = sum(m2_log_nhb(Y_chr_ind,:))>0.5;
+
+figure;
+subplot(2,2,1);
+scatter(score(:,1),score(:,2),30,sum(m2_log_nhb(Y_chr_ind,:)),'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('Y chromosomone gene expression');
+subplot(2,2,2);
+scatter(score(:,1),score(:,2),20,fetal2,'filled');
+colormap(gca,flip(brewermap(2,'Set1')));
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('fetal');
+
+% DE genes between fetal and everything else
+fetal_vec_2 = fetal2 + 1;
+[DE_genes_m2,DE_genes_pvals_m2,DE_genes_names_m2] = DE_genes_pvals(m2_tpm_nhb,fetal_vec_2,genes_no_hb,0.0001);
+
+% first 5 genes are sig maternal and all of the fetal are 
+mat_fet2 = DE_genes_names_m2(1:5,:);
+top_list = mat_fet2(:);
+fetal2_DE_list_ind = ismember(genes_no_hb,top_list);
+
+% cluster based on fetal and new DE genes
+m2_clust_b = cluster((linkage(pdist(m2_log_nhb(fetal2_DE_list_ind,:)'),'ward')),2);
+
+figure;gscatter(score(:,1),score(:,2),m2_clust_b,s4,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+% [DE_genes_m2b,DE_genes_pvals_m2b,DE_genes_names_m2b] = DE_genes_pvals(m2_tpm_nhb,m2_clust_b,genes_no_hb,0.0001);
+% 
+% mat_fet2b = DE_genes_names_m2b;
+% 
+% 1 is maternal 2 is fetal
+m2mb = m2_clust_b == 1;
+m2fb = m2_clust_b == 2;
+
+% maternal
+m2mb_tpm = m2_tpm_nhb(:,m2mb);
+m2mb_log = m2_log_nhb(:,m2mb);
+m2mb_vec = TP2_macs_tx_vec(m2mb);
+
+%fetal
+m2fb_tpm = m2_tpm_nhb(:,m2fb);
+m2fb_log = m2_log_nhb(:,m2fb);
+m2fb_vec = TP2_macs_tx_vec(m2fb);
+
+% TP1 define fetal signature including sham
+[info_genes_m1,info_genes_names_m1] = info_genes(m1_tpm_nhb,2,2,genes_no_hb);%675
+
+[coeff,score,~,~,explained,~] = pca(m1_log_nhb(info_genes_m1,:)');
+figure;gscatter(score(:,1),score(:,2),TP1_macs_tx_vec,tx_colors,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+legend(tx_label);
+
+%  define fetal cells and look at where they are in PCA
+fetal1 = sum(m1_log_nhb(Y_chr_ind,:))>0;
+
+figure;
+subplot(2,2,1);
+scatter(score(:,1),score(:,2),30,sum(m1_log_nhb(Y_chr_ind,:)),'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('Y chromosomone gene expression');
+subplot(2,2,2);
+scatter(score(:,1),score(:,2),20,fetal1,'filled');
+colormap(gca,flip(brewermap(2,'Set1')));
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('fetal');
+
+% DE genes between fetal and everything else
+fetal_vec_2 = fetal1 + 1;
+[DE_genes_m1,DE_genes_pvals_m1,DE_genes_names_m1] = DE_genes_pvals(m1_tpm_nhb,fetal_vec_2,genes_no_hb,0.0001);
+
+% first 79 genes are sig maternal and all of the fetal are 
+mat_fet1 = DE_genes_names_m1(1:79,:);
+top_list = mat_fet1(:);
+fetal1_DE_list_ind = ismember(genes_no_hb,top_list);
+
+% cluster based on fetal and new DE genes
+m1_clust_b = cluster((linkage(pdist(m1_log_nhb(fetal1_DE_list_ind,:)'),'ward')),2);
+
+figure;gscatter(score(:,1),score(:,2),m1_clust_b,s4,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+[DE_genes_m1b,DE_genes_pvals_m1b,DE_genes_names_m1b] = DE_genes_pvals(m1_tpm_nhb,m1_clust_b,genes_no_hb,0.0001);
+
+mat_fet1b = DE_genes_names_m1b;
+
+% 2 is maternal 1 is fetal- DOUBLE CHECK THIS WAS A BUG SO I JUST FIXED IT
+m1mb = m1_clust_b == 2;
+m1fb = m1_clust_b == 1;
+
+% maternal
+m1mb_tpm = m1_tpm_nhb(:,m1mb);
+m1mb_log = m1_log_nhb(:,m1mb);
+m1mb_vec = TP1_macs_tx_vec(m1mb);
+
+%fetal
+m1fb_tpm = m1_tpm_nhb(:,m1fb);
+m1fb_log = m1_log_nhb(:,m1fb);
+m1fb_vec = TP1_macs_tx_vec(m1fb);
+%% 72h Fetal DE genes between condition and enrichment of WT genes
+[DE_genes_m4f,DE_genes_vals_m4f,DE_genes_names_m4f] = DE_genes_pvals(m4fb_tpm,m4fb_vec,genes_no_hb,0.0001);
+
+fw_genes = DE_genes_names_m4f(1:46,3);
+fw_ind = ismember(genes_no_hb,fw_genes);
+
+% look at enrichment
+genes = ismember(gene_names_correct,DE_genes_names_m4f(1:46,3));
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(genes,p_thresh_go, GO_mat_mouse_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:10);
+
+figure;
+barh(flip(-log10(Pvals(p1)')),'k');
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+set(gca,'Fontsize',15);
+
+print -painters -depsc 'Fig_4D_GO.pdf'
+%% save data for Fig_4E
+save Fig_4D_data.mat m4mb_tpm m4mb_log m4mb_vec m4fb_tpm m4fb_log m4fb_vec...
+    m3mb_tpm m3mb_log m3mb_vec m3fb_tpm m3fb_log m3fb_vec...
+    m2mb_tpm m2mb_log m2mb_vec m2fb_tpm m2fb_log m2fb_vec...
+    m1mb_tpm m1mb_log m1mb_vec m1fb_tpm m1fb_log m1fb_vec... 
+    fw_genes fw_ind;
+end
+
+if Fig_4E % replace this with test code below
+%% load data
+load Fig_4D_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct.mat
+load Fig_4A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+%% Fetal inflammatory expression between time points 
+
+[DE_genes_m4f,DE_genes_vals_m4f,DE_genes_names_m4f] = DE_genes_pvals(m4fb_tpm,m4fb_vec,genes_no_hb,0.0001);
+
+s4_exp = sum(m4fb_log(fw_ind,m4fb_vec == 1));
+k4_exp = sum(m4fb_log(fw_ind,m4fb_vec == 2));
+w4_exp = sum(m4fb_log(fw_ind,m4fb_vec == 3));
+
+s3_exp = sum(m3fb_log(fw_ind,m3fb_vec == 1));
+k3_exp = sum(m3fb_log(fw_ind,m3fb_vec == 2));
+w3_exp = sum(m3fb_log(fw_ind,m3fb_vec == 3));
+
+s2_exp = sum(m2fb_log(fw_ind,m2fb_vec == 1));
+k2_exp = sum(m2fb_log(fw_ind,m2fb_vec == 2));
+w2_exp = sum(m2fb_log(fw_ind,m2fb_vec == 3));
+
+s1_exp = sum(m1fb_log(fw_ind,m1fb_vec == 1));
+k1_exp = sum(m1fb_log(fw_ind,m1fb_vec == 2));
+w1_exp = sum(m1fb_log(fw_ind,m1fb_vec == 3));
+
+sham_scores = horzcat(s1_exp,s2_exp,s3_exp,s4_exp);
+sham_scores_vec = repelem(1:4,[size(s1_exp,2),size(s2_exp,2),size(s3_exp,2),size(s4_exp,2)]);
+
+ko_scores = horzcat(k1_exp,k2_exp,k3_exp,k4_exp);
+ko_scores_vec = repelem(1:4,[size(k1_exp,2),size(k2_exp,2),size(k3_exp,2),size(k4_exp,2)]);
+
+wt_scores = horzcat(w1_exp,w2_exp,w3_exp,w4_exp);
+wt_scores_vec = repelem(1:4,[size(w1_exp,2),size(w2_exp,2),size(w3_exp,2),size(w4_exp,2)]);
+
+time_labels = {'12h','24h','48h','72h'};
+
+
+x1 = [1,2,3,4];
+x2 = [1.3,2.3,3.3,4.3];
+x3 = [1.6 2.6 3.6 4.6];
+
+figure;
+b1 = boxplot(sham_scores,sham_scores_vec,'positions',x1,'colors',tx_colors(1,:),'widths',0.20,'Symbol','+');
+set(b1,{'linew'},{2});
+hold on;
+
+b2 = boxplot(ko_scores,ko_scores_vec,'positions',x2,'colors',tx_colors(2,:),'widths',0.20,'Symbol','+');
+set(b2,{'linew'},{2})
+hold on;
+
+b3 = boxplot(wt_scores,wt_scores_vec,'positions',x3,'labels',time_labels,'colors',tx_colors(3,:),'widths',0.20,'Symbol','+')
+set(b3,{'linew'},{2})
+xlim([0.5 5]);
+title('WT fetal inflammatory genes');set(gca,'Fontsize',15);
+
+
+[~,p] = ttest2(k4_exp,w4_exp)
+ 
+print -painters -depsc 'Fig_4E.pdf'
+%% save data for S4C
+save Fig_4E_data.mat DE_genes_names_m4f DE_genes_m4f
+end 
+
+if Fig_4F
+%% load data
+load Fig_4D_data.mat
+load Fig_4A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+%% maternal macophrophages 72h PCA
+% remove sham
+m4mg = m4mb_vec == 2|m4mb_vec == 3;
+
+m4mg_tpm = m4mb_tpm(:,m4mg);
+m4mg_log = m4mb_log(:,m4mg);
+m4mg_vec = m4mb_vec(m4mg);
+m4mg_vec2 = m4mg_vec - 1;
+
+% info genes and PCA
+
+[info_genes_m4mg,info_genes_names_m4mg] = info_genes(m4mg_tpm,2,2,genes_no_hb);%781
+
+[coeff,score,~,~,explained,mu] = pca(m4mg_log(info_genes_m4mg,:)');
+
+figure;
+subplot(2,2,1)
+scatter(score(:,1),score(:,2),10,m4mg_vec,'filled');
+colormap(tx_colors(2:3,:));
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+print -painters -depsc 'Fig_4F_PCA.pdf'
+%% pc1 score comparison 
+scores1 = score(:,1);
+% m4mg_vec2
+x = 1;
+x2 = 1.2;
+figure;
+b = boxplot(scores1(m4mg_vec2 == 1),'positions',x,'colors',tx_colors(2,:),'widths',0.10,'Symbol','+');
+set(b,{'linew'},{2})
+hold on;
+b2 = boxplot(scores1(m4mg_vec2 == 2),'positions',x2,'colors',tx_colors(3,:),'widths',0.10,'Symbol','+');
+set(b2,{'linew'},{2})
+ylim([-10 10]);
+%set(gca,'visible','off');
+
+[~,p] = ttest2(scores1(m4mg_vec2 == 1),scores1(m4mg_vec2 == 2))
+print -painters -depsc 'Fig_4F_PC1_boxplot.pdf'
+%% save Fig_4F data
+score_mm = score;
+coeff_mm = coeff;
+save Fig_4F_data.mat info_genes_m4mg info_genes_names_m4mg score_mm coeff_mm m4mg_tpm m4mg_log m4mg_vec...
+   m4mg_vec2 ;
+end
+
+if Fig_4G
+%% load data
+load Fig_4D_data.mat
+load Fig_4A_data.mat
+load Fig_4F_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+load prepare_the_data/cmap_color_blind.mat;
+load pc_score_colors.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct.mat;
+load prepare_the_data/in_vivo_E/GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X;
+%% maternal macrophages PC 1 high genes and heatmap 
+% enrichment on PC1 high genes
+thresh_coeff = sqrt(1/(sum(info_genes_m4mg,1)));
+pc = 1;
+%select high and low genes
+genes_hi_coeff = (coeff_mm(:,pc)) > thresh_coeff;
+a = info_genes_names_m4mg(genes_hi_coeff)
+
+% look at enrichment
+genes = ismember(gene_names_correct,a);
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(genes,p_thresh_go, GO_mat_mouse_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:10);
+    
+figure;
+barh(flip(-log10(Pvals(p1)')),'k');
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+set(gca,'Fontsize',15);
+
+print -painters -depsc 'Fig_4F_maternal_GO.pdf'
+%% make a heatmap of top 20 genes
+coeff1 = coeff_mm(:,1);
+[i,xi] = sort(coeff1,'descend');
+top_coeff = info_genes_names_m4mg(xi(1:20));
+top_ind = ismember(genes_no_hb,top_coeff);
+top_names = genes_no_hb(top_ind);
+
+[k,fk] = sort(scores1);
+
+coeff1 = coeff_mm(:,1);
+[i,xi] = sort(coeff1,'descend');
+top_coeff = info_genes_names_m4mg(xi(1:20));
+
+
+top_coeff_ind = NaN(size(top_coeff));
+for t= 1:length(top_coeff_ind)
+    [~,~,top_coeff_ind(t)] = intersect(top_coeff(t),genes_no_hb);
+end
+
+
+mat = m4mg_tpm(top_coeff_ind,:);
+matz = zscore(mat,0,2);
+scores1 = score_mm(:,1);
+
+[k,fk] = sort(scores1);
+
+figure;
+subplot(10,1,1:8);
+imagesc(matz(:,fk));
+caxis([-2 2]);
+colormap(cmap_color_blind);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(top_coeff));set(gca,'yticklabel',top_coeff);
+subplot(10,1,9);
+imagesc(m4mg_vec(fk));
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(gca,tx_colors(2:3,:));
+subplot(10,1,10);
+imagesc(scores1(fk)');
+colormap(gca,pc_score_colors);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+print -painters -depsc 'Fig_4F_heatmap_maternal.pdf'
+
+[grad,im]=colorGradient([47,58,111],[240, 240, 240],128)
+
+figure;
+subplot(1,10,1:2);
+imagesc(coeff1(xi(1:20)));colormap(grad);
+
+print -painters -depsc 'Fig_4F_coeff.pdf'
+
+
+zmat = zscore(m4mg_tpm,0,2);
+
+vec = NaN(size(top_coeff_ind));
+for v = 1:length(top_coeff_ind)
+    gene = (strmatch(top_coeff(v),genes_no_hb,'exact'))
+    [~,p] = ttest2(zmat(gene,m4mg_vec == 2),zmat(gene, m4mg_vec == 3));
+    vec(v) = p;        
+end
+
+c1 = [236, 112, 99];
+c2 = [240 240 240];
+depth = 128;
+[grad,im]=colorGradient(c1,c2,depth);
+
+figure;
+subplot(1,10,8:10);
+imagesc(-log(vec));colorbar;
+caxis([0 10]);colormap(grad);colorbar;
+
+print -painters -depsc 'Fig_4G_sig_vec.pdf'
+end
+
+Fig_S4A = 0; % macrophage PCA colored by Y chromosome expression
+Fig_S4B = 0; % macrophage PCA colored by cell cycle
+Fig_S4C = 0; % heatmap of fetal WT DE genes
+Fig_S4D = 0; % boxplot of sum maternal PC 1 gene expression between conditions
+Fig_S4E = 0; % heatmap of maternal macrophage DE genes
+Fig_S4F = 0; % GO enrichment of maternal macrophage DE genes
+Fig_S4G = 0; % maternal macrophage PC 1 scores at time points post infection
+
+if Fig_S4A
+%% load data
+load Fig_4A_data.mat
+load Fig4_data.mat
+load prepare_the_data/in_vivo_E/Y_chr_genes.mat
+load prepare_the_data/cmap_color_blind.mat
+%% PCA colored by Y chromosome gene expression
+Y_chr_ind = ismember(genes_no_hb,Y_chr_genes);
+
+figure;
+subplot(2,2,1);
+scatter(score_m(:,1),score_m(:,2),10,sum(m4_log_nhb(Y_chr_ind,:)),'filled');
+colormap(cmap_color_blind);
+set(gca,'xtick',[]);set(gca,'ytick',[]);caxis([0 0.74]);
+
+print -painters -depsc 'Fig_S4A_PCA.pdf'
+end
+
+if Fig_S4B
+%% load data
+load Fig4_data.mat
+load Fig_4A_data.mat
+%% PCA colored by cell cycle score
+[a,G1_S] = xlsread('G1_S_mmu.xlsx');
+[a,G2] = xlsread('G2_mmu.xlsx');
+
+genes_ind_g1s = ismember(genes_no_hb,G1_S);
+genes_ind_g2 = ismember(genes_no_hb,G2);
+c_scores = log2(sum(m4_log_nhb(genes_ind_g1s,:))./sum(m4_log_nhb(genes_ind_g2,:)));
+
+figure;
+subplot(2,2,1);
+scatter(score_m(:,1),score_m(:,2),10,c_scores,'filled');
+% colorbar;
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S4B_cell_cycle.pdf'
+end
+
+if Fig_S4C
+%% load data
+load Fig_4D_data.mat
+load Fig_4E_data.mat
+load Fig4_data.mat
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+%% heatmap of fetal DE genes
+top_genes = DE_genes_m4f(1:22,3);
+top_names = genes_no_hb(top_genes);
+
+mat = m4fb_tpm(top_genes,:);
+matz = zscore(mat,0,2);
+
+[i,xi] = sort(m4fb_vec,'ascend');
+
+figure;
+subplot(10,1,1:9);
+imagesc(smoothdata(matz(:,xi),2));caxis([-1 1]);
+colormap(cmap_color_blind);set(gca,'xtick',[]);
+set(gca,'ytick',1:length(top_names)),set(gca,'yticklabel',top_names);
+subplot(10,1,10);
+imagesc(m4fb_vec(xi));
+colormap(gca,tx_colors);colorbar;
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+print -painters -depsc 'Fig_S4C_fetal_heatmap.pdf'
+end
+
+if Fig_S4D
+%% load data
+load Fig_4F_data.mat
+load Fig_4D_data.mat
+load Fig_4A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+%% boxplot of sum PC 1 gene expression
+coeff1 = coeff_mm(:,1);
+[i,xi] = sort(coeff1,'descend');
+top_coeff = info_genes_names_m4mg(xi(1:20));
+
+
+top_coeff_ind = NaN(size(top_coeff));
+for t= 1:length(top_coeff_ind)
+    [~,~,top_coeff_ind(t)] = intersect(top_coeff(t),genes_no_hb);
+end
+
+zmat = zscore(m4mg_tpm,0,2);
+
+figure;
+b = boxplot(sum(zmat(top_coeff_ind,:)),m4mg_vec,'colors',tx_colors(2:3,:),'widths',0.25,'Symbol','+');
+set(b,{'linew'},{2})
+xlim([-1 4]);
+
+print -painters -depsc 'Fig_S4_pc1_genes_boxplot.pdf'
+
+[~,p] = ttest2(sum(zmat(top_coeff_ind,m4mg_vec == 2)),sum(zmat(top_coeff_ind,m4mg_vec == 3)))
+end
+
+if Fig_S4E
+%% load data
+load Fig_4A_data.mat
+load Fig_4D_data.mat
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+%% maternal DE genes 72h
+[DE_genes_m4,DE_genes_pvals_m4,DE_genes_names_m4] = DE_genes_pvals(m4mg_tpm,m4mg_vec2,genes_no_hb,0.0001);
+
+% display top 
+% top = DE_genes_m4(1:26,:);
+top = DE_genes_m4(1:20,:);
+top_ind = top(:);
+top_names = genes_no_hb(top_ind);
+
+mat = m4mg_tpm(top_ind,:);
+matz = zscore(mat,0,2);
+
+tx_colors2 = tx_colors(2:3,:);
+figure;
+subplot(10,1,1:9);
+imagesc(matz);caxis([-2 2]);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(top_names));set(gca,'yticklabel',top_names);
+colormap(cmap_color_blind);set(gca,'Fontsize',8);
+subplot(10,1,10);
+imagesc(m4mg_vec2);colormap(gca,tx_colors2);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+print -painters -depsc 'Fig_S4E_heatmap.pdf'
+%% save data for figure S4F
+save Fig_S4E_data.mat DE_genes_m4 DE_genes_names_m4;
+end
+
+if Fig_S4F
+%% load data
+load prepare_the_data/in_vivo_E/gene_names_correct.mat
+load Fig_S4E_data.mat
+load Fig_4D_data.mat
+load Fig_4A_data.mat
+load prepare_the_data/in_vivo_E/GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X
+%% enrichment of maternal DE genes
+genes = ismember(gene_names_correct,DE_genes_names_m4(1:26,1));
+
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(genes,p_thresh_go, GO_mat_mouse_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:10);
+    
+figure;
+barh(flip(-log10(Pvals(p1)')),'k');
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+set(gca,'Fontsize',15);
+print -painters -depsc 'Fig_S4c_ko_go.pdf'
+
+% WT enrichment
+
+genes = ismember(gene_names_correct,DE_genes_names_m4(1:26,2));
+
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(genes,p_thresh_go, GO_mat_mouse_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:10);
+    
+figure;
+barh(flip(-log10(Pvals(p1)')),'k');
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+set(gca,'Fontsize',15);
+print -painters -depsc 'Fig_S4c_wt_go.pdf'
+end
+
+if Fig_S4G 
+%% load data
+load Fig_4F_data.mat
+load Fig_4A_data.mat
+load Fig_4D_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+%% maternal PC 1 scores across time points
+
+% remove sham
+m4mg = m4mb_vec == 2|m4mb_vec == 3;
+
+m4mg_tpm = m4mb_tpm(:,m4mg);
+m4mg_log = m4mb_log(:,m4mg);
+m4mg_vec = m4mb_vec(m4mg);
+m4mg_vec2 = m4mg_vec - 1;
+
+% info genes and PCA
+[info_genes_m4mg,info_genes_names_m4mg] = info_genes(m4mg_tpm,2,2,genes_no_hb);%722
+[coeff,score,~,~,explained,mu] = pca(m4mg_log(info_genes_m4mg,:)');
+
+scores1 = score(:,1);
+
+k4_scores = scores1(m4mg_vec2 == 1);
+w4_scores = scores1(m4mg_vec2 == 2);
+
+% TP3
+% remove sham
+m3mg = m3mb_vec == 2|m3mb_vec == 3;
+
+m3mg_tpm = m3mb_tpm(:,m3mg);
+m3mg_log = m3mb_log(:,m3mg);
+m3mg_vec = m3mb_vec(m3mg);
+
+m3mg_mat = m3mg_log(info_genes_m4mg,:);
+m3mg_scores = (m3mg_mat'-mu)/coeff';
+m3mg_scores1 = m3mg_scores(:,1);
+m3mg_scores2 = m3mg_scores(:,2);
+
+k3_scores = m3mg_scores1(m3mg_vec == 2);
+w3_scores = m3mg_scores1(m3mg_vec == 3);
+
+% TP2
+% remove sham
+m2mg = m2mb_vec == 2|m2mb_vec == 3;
+
+m2mg_tpm = m2mb_tpm(:,m2mg);
+m2mg_log = m2mb_log(:,m2mg);
+m2mg_vec = m2mb_vec(m2mg);
+
+m2mg_mat = m2mg_log(info_genes_m4mg,:);
+m2mg_scores = (m2mg_mat'-mu)/coeff';
+m2mg_scores1 = m2mg_scores(:,1);
+
+k2_scores = m2mg_scores1(m2mg_vec == 2);
+w2_scores = m2mg_scores1(m2mg_vec == 3);
+
+% TP1
+% remove sham
+m1mg = m1mb_vec == 2|m1mb_vec == 3;
+
+m1mg_tpm = m1mb_tpm(:,m1mg);
+m1mg_log = m1mb_log(:,m1mg);
+m1mg_vec = m1mb_vec(m1mg);
+
+m1mg_mat = m1mg_log(info_genes_m4mg,:);
+m1mg_scores = (m1mg_mat'-mu)/coeff';
+m1mg_scores1 = m1mg_scores(:,1);
+
+k1_scores = m1mg_scores1(m1mg_vec == 2);
+w1_scores = m1mg_scores1(m1mg_vec == 3);
+
+% display
+ko_label = {'TP1 KO','TP2 KO','TP3 KO','TP4 KO'};
+ko_scores = vertcat(k1_scores,k2_scores,k3_scores,k4_scores);
+ko_scores_vec = repelem(1:4,[size(k1_scores,1),size(k2_scores,1),size(k3_scores,1),size(k4_scores,1)]);
+
+wt_label = {'TP1 WT','TP2 WT','TP3 WT','TP4 WT'};
+wt_scores = vertcat(w1_scores,w2_scores,w3_scores,w4_scores);
+wt_scores_vec = repelem(1:4,[size(w1_scores,1),size(w2_scores,1),size(w3_scores,1),size(w4_scores,1)]);
+
+time_labels = {'TP 1','TP 2','TP 3','TP 4'};
+x1 = [1,2,3,4]
+x2 = [1.3,2.3,3.3,4.3]
+
+figure;
+b = boxplot(ko_scores,ko_scores_vec,'positions',x1,'colors',tx_colors(2,:),'widths',0.25,'Symbol','+')
+set(b,{'linew'},{2})
+hold on;
+b2 = boxplot(wt_scores,wt_scores_vec,'positions',x2,'labels',time_labels,'colors',tx_colors(3,:),'widths',0.25,'Symbol','+')
+set(b2,{'linew'},{2})
+title('PC 1 scores');set(gca,'Fontsize',15);
+[~,p] = ttest2(k3_scores,w3_scores)
+
+print -painters -depsc 'Fig_S4G.pdf'
+end
