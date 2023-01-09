@@ -1,1 +1,752 @@
 
+Fig_2A = 0; % PCA colored by treatment
+Fig_2B = 0; % PCA colored by cell lineage and heatmap of lineages
+Fig_2C = 0; % correlation analysis within lineages
+Fig_2D = 0; % stacked barplot of composition within cluster
+Fig_2E = 0; % stacked bar plot of cell types per condition
+
+
+if Fig_2A
+%% load data
+load prepare_the_data/in_vivo_E/sc_data_d.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+%% colors
+% lineage clusters
+l_c = vertcat(s4(1,:),s4(2,:),s4(3,:));
+
+% immune subtype colors
+a = brewermap(11,'Purples');a1 = a(7,:);
+b = brewermap(11,'Purples');b1 = b(9,:);
+i_c = vertcat(a1,b1);g = [0.5 0.5 0.5];
+i_c_lg = vertcat(g,i_c);
+
+% trophoblast subtype colors
+g = [0.5 0.5 0.5];
+b = brewermap(9,'Blues');b1 = b(3:9,:);
+t_c = vertcat(g,b);
+
+% inf vs sham colors
+s = tx_colors(1,:);
+i = brewermap(11,'PuBuGn');i1 = i(10,:);
+is_c = vertcat(s,i1);
+%% PCA on 48h post infection colored by condition
+TP3 = tp_vec == 3;
+
+TP3_tpm = tpm_all(:,TP3);
+TP3_log = log_all(:,TP3);
+
+TP3_mat_vec = mat_vec_all(TP3);
+TP3_tx_vec = tx_vec(TP3);
+
+%  info genes PCA
+[info_genes_3,info_genes_names_3] = info_genes(TP3_tpm,2,2,gene_names_correct);%585
+
+[coeff,score,~,~,explained,~] = pca(TP3_log(info_genes_3,:)');
+
+r = randperm(length(TP3_mat_vec));
+
+figure;
+subplot(2,2,1)
+scatter(score(r,1),score(r,2),10,TP3_tx_vec(r),'filled');
+colormap(gca,tx_colors);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_2A_PCA.pdf'
+
+figure;
+subplot(2,2,1)
+scatter(score(r,1),score(r,2),10,TP3_tx_vec(r),'filled');
+colormap(gca,tx_colors);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_2A_PCA_small.pdf'
+%% save Fig_2A_data
+score_a = score;
+save Fig_2A_data.mat TP3_tpm TP3_log TP3_mat_vec TP3_tx_vec l_c  i_c_lg i_c t_c is_c ...
+    info_genes_3 info_genes_names_3 r score_a;
+end
+
+if Fig_2B
+%% load data
+load Fig_2A_data.mat
+load prepare_the_data/cmap_color_blind.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+%% cluster and color PCA by cluster
+
+% cluster & combine immune lineages
+TP3_clust4 = cluster((linkage(pdist(TP3_log(info_genes_3,:)'),'ward')),4);
+TP3_clust4_g = TP3_clust4+4;
+
+new_order = [2,1,3,4];
+for f = 1:max(new_order)
+    TP3_clust4_g(TP3_clust4_g == f+4) = new_order(f);
+end
+
+% lin_labels = {'trophoblast','macrophage','neutrophil','erythrocyte'};
+
+TP3_clust4_g3 = TP3_clust4_g;
+TP3_clust4_g3(TP3_clust4_g == 3) = 2;
+TP3_clust4_g3(TP3_clust4_g == 4) = 3;
+
+% define clear colors
+a = brewermap(10,'Spectral');
+z = brewermap(6,'Set2');
+y = brewermap(6,'Set1');
+b = a(2,:);
+c = y(5,:);
+d = z(6,:);
+e = vertcat(b,c,d);
+
+figure;
+scatter(score_a(r,1),score_a(r,2),10,TP3_clust4_g3(r),'filled');
+colormap(gca,e);
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_2B_PCA.pdf'
+
+figure;
+subplot(2,2,1)
+scatter(score_a(r,1),score_a(r,2),10,TP3_clust4_g3(r),'filled');
+colormap(gca,e);
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_2B_PCA_small.pdf'
+%% heatmap
+[DE_genes_TP33,DE_genes_pvals_TP33,DE_genes_names_TP33] = DE_genes_pvals(TP3_tpm,TP3_clust4_g3,gene_names_correct,0.0001);
+t = DE_genes_TP33(1:10,:);t_list = t(:);t_list_names = gene_names_correct(t_list);
+[~,xi] = sort(TP3_clust4_g3,'ascend');
+
+% display 
+mat = TP3_tpm(t_list,:);
+mat_z = zscore(mat,0,2);
+z_order = zavit_pca(mat,0);
+
+figure;
+subplot(10,1,1:9);
+imagesc(mat_z(:,xi));caxis([-3 3]);
+for f = 1:max(TP3_clust4_g3)
+    x1 = max(find(TP3_clust4_g3(xi) == f))
+    xline(x1,'k','Linewidth',1);    
+    y1 = (10*(f-1)); 
+    if y1>0
+        y2 = y1+0.5;
+    else
+        y2 = y1;
+    end
+    yline(y2,'k','Linewidth',1);
+end
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(t_list_names));set(gca,'yticklabel',t_list_names);
+colormap(gca,cmap_color_blind);
+subplot(10,1,10);
+imagesc(TP3_clust4_g3(xi)');
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(gca,e);
+print -painters -depsc 'Fig_2B_heatmap.pdf'
+%% save Fig_2B_data
+save Fig_2B_data.mat TP3_clust4_g3 e;
+end
+
+if Fig_2C
+%% load data
+load Fig_2B_data.mat;
+load Fig_2A_data.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+%% Fig 2E: lineage correlation analysis 
+disp_order = [2,3,1];
+labels = [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0];
+lin_label = {'trophoblast','immune','erythrocyte'}; % this needs to be in clustering order so it matches c
+figure;
+for c = 1:max(TP3_clust4_g3)
+    % define cluster
+    lin = TP3_clust4_g3 == c;
+    
+    % create infected vs sham vector
+    lin_tx_vec = TP3_tx_vec(lin);
+    lin_tx_vec2 = lin_tx_vec;lin_tx_vec2(lin_tx_vec == 3) = 2;
+    
+    % define info genes for this lin
+    [info_genes_l,~] = info_genes(TP3_tpm(:,lin),2,2,gene_names_correct);sum(info_genes_l)
+    
+    % make a log mat of this lineage for subsequent loops
+    lin_mat_log = TP3_log(:,lin);
+    
+    % define condition indices
+    sham_ind = find(lin_tx_vec2 == 1);
+    inf_ind = find(lin_tx_vec2 == 2);
+    
+    clear combo_mat; clear sham_mat;
+    
+    % calculate correlations
+    combo_mat = NaN(length(sham_ind),length(inf_ind));
+    for s = 1:length(sham_ind)
+        s_ind = sham_ind(s);
+        s_prof = lin_mat_log(info_genes_l,s_ind);
+        for i = 1:length(inf_ind)
+            i_ind = inf_ind(i);
+            i_prof = lin_mat_log(info_genes_l,i_ind);
+            a = corrcoef(s_prof,i_prof);
+            combo_mat(s,i) = a(1,2);
+        end
+    end
+    combolist = combo_mat(:);
+    
+    sham_mat = NaN(length(sham_ind),length(sham_ind));
+    for s = 1:length(sham_ind)
+        s_ind = sham_ind(s);
+        s_prof = lin_mat_log(info_genes_l,s_ind);
+        for i = 1:length(sham_ind)
+            i_ind = sham_ind(i);
+            i_prof = lin_mat_log(info_genes_l,i_ind);
+            a = corrcoef(s_prof,i_prof);
+            sham_mat(s,i) = a(1,2);
+        end
+    end
+    
+    % take lower half of sham list
+    shamlist2 = tril(sham_mat,-1);
+    shamlist_ind = shamlist2>0;
+    shamlist = shamlist2(shamlist_ind);
+    
+    % normalize distributions - for erythrocyte dont smooth:
+    
+    if c == 3
+        sham = hist(shamlist,100);
+        sham2 = sham./sum(sham);
+        combo = hist(combolist,100);
+        combo2 = combo./sum(combo);
+    else
+        sham = smoothdata(hist(shamlist,100));
+        sham2 = sham./sum(sham);        
+        combo = smoothdata(hist(combolist,100));
+        combo2 = combo./sum(combo);
+    end
+       
+    subplot(2,3,disp_order(c));
+    plot(sham2,'Color',is_c(1,:),'LineWidth',3);hold on;
+    plot(combo2,'Color',is_c(2,:),'LineWidth',3);hold on;
+    set(gca,'xtick',1:10:100);set(gca,'xticklabel',labels);
+    xlim([00.5 100.5]);title(lin_label(c));
+    legend('sham vs sham','sham vs infected');
+end
+
+print -painters -depsc 'Fig_2C.pdf'
+end
+
+if Fig_2D
+%% load data
+load Fig_2B_data.mat
+load Fig_2A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+%% barplot with composition of condition per cluster
+nan_mat = NaN(3,3);
+for f = 1:max(TP3_clust4_g3)
+    % within each count the number from each clust
+    c = TP3_clust4_g3 == f;
+    vec = TP3_tx_vec(c);
+    for g = 1:max(vec)
+        nan_mat(g,f) = sum(vec == g)./size(vec,2);
+    end
+end
+
+labels = {'erythrocyte','trophoblast','immune'};
+nan_mat_new = horzcat(nan_mat(:,3),nan_mat(:,1),nan_mat(:,2));
+
+figure;
+subplot(2,2,1);
+b = bar(nan_mat_new',0.5,'stacked');legend('Sham','KO','WT');;
+b(1).FaceColor = tx_colors(1,:);
+b(2).FaceColor = tx_colors(2,:);
+b(3).FaceColor = tx_colors(3,:);
+set(gca,'xtick',1:length(labels)); set(gca,'xticklabel',labels);
+ylim([0 1.1]);  xtickangle(45)
+
+print -painters -depsc 'Fig_2D_barplot.pdf'
+end
+
+if Fig_2E
+%% load data
+load Fig_2B_data.mat
+load Fig_2A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+%% barplot of composition within condition    
+nan_mat2 = NaN(3,3);
+for f = 1:max(TP3_tx_vec)
+    % within each condition count the number from each cell lineage
+    t = TP3_tx_vec == f;
+    lin_vec_t = TP3_clust4_g3 (t);
+
+    for g = 1:max(lin_vec_t)
+        nan_mat2(g,f) = sum(lin_vec_t == g)./size(lin_vec_t,2);
+    end
+end
+% lin order: trophoblast, immune, erythrocyte
+
+a = brewermap(10,'Spectral');
+z = brewermap(6,'Set2');
+y = brewermap(6,'Set1');
+b = a(2,:);
+c = y(5,:);
+d = z(6,:);
+e = vertcat(b,c,d);
+
+
+figure;
+subplot(2,2,1);
+b = bar(nan_mat2',0.5,'stacked');legend('troph','immune','eryth');
+b(1).FaceColor = e(1,:);
+b(2).FaceColor = e(2,:);
+b(3).FaceColor = e(3,:);
+
+print -painters -depsc 'Fig_2E_barplot_legend.pdf'
+
+figure;
+subplot(2,2,1);
+b = bar(nan_mat2',0.5,'stacked');
+b(1).FaceColor = e(1,:);
+b(2).FaceColor = e(2,:);
+b(3).FaceColor = e(3,:);
+
+print -painters -depsc 'Fig_2E_barplot_no_legend.pdf'
+
+nan_mat2 = NaN(3,3);
+for f = 1:max(TP3_tx_vec)
+    % within each condition count the number from each cell lineage
+    t = TP3_tx_vec == f;
+    lin_vec_t = TP3_clust4_g3 (t);
+
+    for g = 1:max(lin_vec_t)
+        nan_mat2(g,f) = sum(lin_vec_t == g)./size(lin_vec_t,1);
+    end
+end
+
+f = nan_mat2(1,:);
+g = nan_mat2(2,:);
+h = nan_mat2(3,:);
+
+j = vertcat(g,f,h)
+figure;
+subplot(2,2,1);
+b = bar(j',0.5,'stacked');
+b(1).FaceColor = e(2,:);
+b(2).FaceColor = e(1,:);
+b(3).FaceColor = e(3,:);
+print -painters -depsc 'Fig_2E_barplot_percent_whole.pdf'
+end
+
+Fig_S2A = 0; % tSNE colored by treatment and cluster
+Fig_S2B = 0; % heatmap of lineage markers
+Fig_S2C = 0; % immune lineage PCA and clustering
+Fig_S2D = 0; % heatmap of immune subypte markers
+Fig_S2E = 0; % trophoblast lineage PCA and tsne
+Fig_S2F = 0; % heatmap of trophoblast subtype markers
+Fig_S2H = 0; % enrichment map of trophoblast subtype genes
+Fig_S2I = 0; % heatmap of erythrocyte DE genes
+
+if Fig_S2A
+%% load data
+load Fig_2A_data.mat
+load Fig_2B_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+%% tsne colored by condition
+% % only on first 3 PCs
+% no_dims       = 2;
+% initial_dims  = 3;
+% perplexity    = 50;
+% Y = TP3_log(info_genes_3,:);
+% mappedY_3e = tsne(Y',[], no_dims, initial_dims, perplexity);
+% save mappedY_3e.mat mappedY_3e;
+
+load mappedY_3e.mat;
+r = randperm(length(TP3_tx_vec));
+
+% by condition
+figure;
+scatter(mappedY_3e(r,1),mappedY_3e(r,2),10,TP3_tx_vec(r),'filled');
+colormap(gca,tx_colors);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2A_tsne_tx.pdf'
+%% tsne colored by cluster
+figure;
+scatter(mappedY_3e(r,1),mappedY_3e(r,2),10,TP3_clust4_g3(r),'filled');
+colormap(gca,e);
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_S2A_tsne_clust.pdf'
+end
+
+if Fig_S2B
+%% load data
+load Fig_2A_data.mat
+load Fig_2B_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+load prepare_the_data/cmap_color_blind.mat
+%% heatmap of lineage markers
+% first make ind of genes
+imm_genes = {'Fcer1g','Ptprc','Cd14'};
+[~,imm_ind] = intersect(gene_names_correct,imm_genes)
+
+troph_genes = {'Prl7d1','Prl3b1','Ceacam11'};
+[~,troph_ind] = intersect(gene_names_correct,troph_genes)
+
+hb_genes = {'Hba-a1','Hba-a2','Hbb-bt'};
+[~,hb_ind] = intersect(gene_names_correct,hb_genes)
+
+ind = vertcat(troph_ind, imm_ind, hb_ind);
+ind_names = gene_names_correct(ind);
+zscore_mat = zscore(TP3_tpm,0,2);
+mat_z = zscore(zscore_mat(ind,:));
+[~,xi] = sort(TP3_clust4_g3,'ascend');
+
+
+figure;
+subplot(10,1,1:9);
+imagesc(mat_z(:,xi));
+set(gca,'ytick',1:length(ind_names));set(gca,'yticklabel',ind_names);
+colormap(gca,cmap_color_blind);
+set(gca,'xtick',[]);caxis([-2 2]);  
+subplot(10,1,10);
+imagesc(TP3_clust4_g3(xi)');
+colormap(gca,e);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+print -painters -depsc 'Fig_S2B_lineage_marker_heatmap.pdf'
+end
+
+if Fig_S2C
+%% load data
+load Fig_2A_data.mat
+load Fig_2B_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+%% immune lineage PCA cluster 
+TP3_i = TP3_clust4_g3 == 2;
+[info_genes_i,info_genes_names_i] = info_genes(TP3_tpm(:,TP3_i),2,2,gene_names_correct);%639
+[coeff,score,~,~,explained,~] = pca(TP3_log(info_genes_i,TP3_i)');
+
+% cluster immune cells
+TP3_i_clust = cluster((linkage(pdist(TP3_log(info_genes_i,TP3_i)'),'ward')),2);
+
+r = randperm(length(TP3_i_clust));
+
+figure;
+scatter(score(r,1),score(r,2),10,TP3_i_clust(r),'filled');
+colormap(i_c);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2C_imm_pca.pdf' 
+
+figure;
+subplot(2,2,1)
+scatter(score(r,1),score(r,2),10,TP3_i_clust(r),'filled');
+colormap(i_c);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2C_imm_pca_small.pdf' 
+
+figure;
+gscatter(score(r,1),score(r,2),TP3_i_clust(r),i_c,'.',10);
+legend('macrophages','neutrophils');
+print -painters -depsc 'Fig_S2C_imm_pca_legend.pdf' 
+%% tsne
+no_dims       = 2;
+initial_dims  = 10;
+% min(find(cumsum(explained)>=90));
+perplexity    = 50;
+Y = TP3_log(info_genes_i,TP3_i);
+% mappedY_3i = tsne(Y',[], no_dims, initial_dims, perplexity);
+
+% save mappedY_3i.mat mappedY_3i;
+load mappedY_3i.mat;
+figure;
+scatter(mappedY_3i(r,1),mappedY_3i(r,2),10,TP3_i_clust(r),'filled');
+colormap(i_c);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2A_i_tsne.pdf' 
+
+figure;
+subplot(2,2,1)
+scatter(mappedY_3i(r,1),mappedY_3i(r,2),10,TP3_i_clust(r),'filled');
+colormap(i_c);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2A_i_tsne_small.pdf' 
+%% save Fig_S2_C_data
+score_i = score;
+save Fig_S2_C_data.mat TP3_i_clust TP3_i score_i
+end
+
+if Fig_S2D
+%% load data
+load Fig_2A_data.mat
+load Fig_S2_C_data    
+load prepare_the_data/in_vivo_E/gene_names_correct
+load prepare_the_data/cmap_color_blind.mat
+%% heatmap of immune subtype 
+neutrophil_genes = {'Neat1','S100a8','S100a9','Ly6g','Slpi'}';n_ind = ismember(gene_names_correct,neutrophil_genes);
+macrophage_genes = {'Cd68','Ly6c2','Spp1','Apoe','Cd74'}';m_ind = ismember(gene_names_correct,macrophage_genes);
+
+all_genes = vertcat(neutrophil_genes,macrophage_genes);
+all_ind = ismember(gene_names_correct,all_genes);
+all_ind_names = gene_names_correct(all_ind);
+
+% display as a heatmap
+scores1 = score_i(:,1)+score_i(:,2);[i,xi] = sort(scores1);
+z_order = zavit_pca(TP3_tpm(all_ind,TP3_i),180);
+
+zmat = zscore(TP3_tpm(all_ind,TP3_i),0,2);
+[i,xi] = sort(TP3_i_clust,'ascend');
+
+figure;
+subplot(10,1,1:5);
+imagesc(zmat(z_order,xi));
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(all_ind_names));set(gca,'yticklabel',all_ind_names(z_order));
+set(gca,'Fontsize',14);
+colormap(gca,cmap_color_blind);colorbar;
+caxis([-2 2]);
+subplot(10,1,6);
+imagesc(TP3_i_clust(xi)');
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(gca,i_c);
+
+print -painters -depsc 'Fig_S2D_heatmap.pdf'
+end
+
+if Fig_S2E
+%% load data
+load Fig_2A_data.mat
+load Fig_2B_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+%% trophoblast PCA and tsne
+troph = TP3_clust4_g3 == 1;
+[info_genes_t,info_genes_names_t] = info_genes(TP3_tpm(:,troph),2,2,gene_names_correct);%449
+
+t_clust_7 = cluster((linkage(pdist(TP3_log(info_genes_t,troph)'),'ward')),7);
+r = randperm(length(t_clust_lg));
+
+TP3_t_log = TP3_log(:,troph);
+[coeff,score,~,~,explained,~] = pca(TP3_t_log(info_genes_t,:)');
+
+t_clust_labels = {'Endothelial Cell Maged2 high','PE lineage cells/Spongiotorphoblast Phlda2 high',...
+    'Endodermal Afp high','Granulocyte/Monocyte Progenitors','Decidual Stromal'...
+    ,'Trophoblast Progenitor Gjb3 high','Trophoblast Porgenitor Tal71 high'};
+
+
+p = brewermap(9,'Dark2');
+q = brewermap(9,'Set2');
+
+f = q(2,:);
+g = q(3,:);
+h = q(4,:);
+i = p(5,:);
+j = p(6,:);
+k = p(3,:);
+l = p(4,:);
+
+t_c2 = vertcat(f,g,l,i,h,j,k);
+r = randperm(length(t_clust_7));
+
+figure;
+gscatter(score(:,1),score(:,2),t_clust_7,t_c2,'.',10);
+legend(t_clust_labels);
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_S2B_PCA_t_legend.pdf'
+
+figure;
+subplot(2,2,1)
+scatter(score(r,1),score(r,2),10,t_clust_7(r),'filled');
+colormap(t_c2);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2E_PCA_t_small.pdf'
+
+figure;
+scatter(score(r,1),score(r,2),10,t_clust_7(r),'filled');
+colormap(t_c2);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2E_PCA_t_lg.pdf'
+%% tsne on trophoblast
+no_dims       = 2;
+initial_dims  = 10;
+perplexity    = 50;
+Y = TP3_log(info_genes_t,troph);
+%mappedY_3t4 = tsne(Y',[], no_dims, initial_dims, perplexity);
+%mappedY_3t = mappedY_3t4;
+%save mappedY_3t.mat mappedY_3t;
+load mappedY_3t.mat;
+% this is what ill add to supp:
+figure;
+scatter(mappedY_3t(r,1),mappedY_3t(r,2),10,t_clust_7(r),'filled');
+colormap(t_c2);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2E_tsne_t_lg.pdf'
+
+figure;
+subplot(2,2,1)
+scatter(mappedY_3t(r,1),mappedY_3t(r,2),10,t_clust_7(r),'filled');
+colormap(t_c2);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S2E_tsne_t_sm.pdf'
+%% save Fig_S2E_data.mat
+save Fig_S2E_data.mat troph t_c2 t_clust_7 TP3_t_log t_clust_labels
+end
+
+if Fig_S2F
+%% load data
+load Fig_2A_data.mat
+load Fig_S2E_data.mat
+load prepare_the_data/cmap_color_blind.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct
+%% heatmap
+c_genes = {'Maged2','Cd34','Phlda2','Lama1','Cyr61','Afp','Apoa1','Cd14','Ctsc','Prl8a2','Cryab',...
+    'Hand1','Gjb3','Taf7l','Isg20'};
+
+c_genes_ind = NaN(1,length(c_genes));
+for c = 1:length(c_genes_ind)
+    [~,c_genes_ind(c),~] = intersect(gene_names_correct,c_genes(c));
+end
+
+[i,xi] = sort(t_clust_7);
+
+zmat = zscore(TP3_tpm(c_genes_ind,troph),0,2);
+
+figure;
+subplot(10,1,1:9);
+imagesc(zmat(:,xi));
+colormap(gca,cmap_color_blind);
+caxis([-2 2]);
+set(gca,'xtick',[]);set(gca,'ytick',1:length(c_genes));set(gca,'yticklabel',c_genes);
+subplot(10,1,10);
+imagesc(t_clust_7(xi)');
+colormap(gca,t_c2);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+print -painters -depsc 'Fig_S2F_heatmap_t_.pdf'
+end
+
+if Fig_S2G
+%% load data
+load Fig_2A_data.mat
+load Fig_S2E_data.mat
+load prepare_the_data/cmap_color_blind.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct
+load prepare_the_data/in_vivo_E/GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X;
+%% GO analysis and heatmap
+ 
+% go through every GO and ask are those genes sig diff b/w infected for
+% each cluster
+TP3_t_tpm = TP3_tpm(:,troph);
+TP3_t_tx_vec = TP3_tx_vec(troph);
+
+% in order to do this need DE genes for each cluster but maybe its between
+% GBS and other? - lets do GBS vs sham DE genes
+
+t_gbs_genes = NaN(100,7);
+t_gbs_genes_pvals = NaN(100,7);
+for f = 1:max(t_clust_7)
+    clust = t_clust_7 == f;
+    clust_vec = TP3_t_tx_vec(clust);
+    clust_vec2 = clust_vec;
+    clust_vec2(clust_vec == 3) = 2;
+    clust_exp = TP3_t_tpm(:,clust);
+    [DE_genes_tg,DE_genes_pvals_tg,DE_genes_names_tg] = DE_genes_pvals(clust_exp,clust_vec2,gene_names_correct,0.0001);
+    t_gbs_genes(:,f) = DE_genes_tg(:,2);
+    t_gbs_genes_pvals(:,f) = DE_genes_pvals_tg(:,2);
+end
+
+
+% use the significant genes from here: t_gbs_genes and do enrichment on
+% them - well take the significant genes
+
+p_thresh_go = 0.00000001;
+
+mat = NaN(size(GO_mat_mouse_50_10X,2),max(t_clust_7));
+vec = NaN(5,max(t_clust_7));
+for a = 1:max(t_clust_7)        
+        % Do DE genes here and do enrichment on the GBS genes
+        % run those thru enrichment
+        % take top categories from each subset and look at heatmap of pvals
+        genes_sig = t_gbs_genes_pvals(:,a)<1;
+        genes = t_gbs_genes(genes_sig);
+        Pvals = Enrichment(genes,p_thresh_go, GO_mat_mouse_50_10X, GO_names_50_10X);
+        [~,xi] = sort(Pvals);
+        vec(:,a) = xi(1:5); %the position of the lowest pvals
+    mat(:,a) = Pvals;
+end
+% take the top category for each and make a matrix out of those pvals for
+% all of them - if this looks ok then take the top 2
+
+% subtypes with no sig genes: 3
+vec = horzcat(vec(:,1:2),vec(:,4:end));
+vec = vec(:);
+vec = unique(vec);
+mat = horzcat(mat(:,1:2),mat(:,4:end));
+pval_mat = mat(vec',:);
+
+
+go_names = GO_names_50_10X(vec);
+figure;
+imagesc(-log(pval_mat));colormap(cmap_color_blind);
+set(gca,'ytick',1:length(go_names));set(gca,'yticklabel',go_names);
+caxis([0 10]);colorbar;
+
+
+print -painters -depsc 'Fig_s2G_enrichment.pdf'
+end
+
+if Fig_S2H
+%% load data
+load Fig_2A_data.mat
+load Fig_2B_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+load prepare_the_data/cmap_color_blind.mat
+%% erythrocyte lineage cell DE genes heatmap
+TP3_e = TP3_clust4_g3 == 3;
+TP3_e_tpm = TP3_tpm(:,TP3_e);
+TP3_e_vec = TP3_tx_vec(TP3_e);
+TP3_e_vec2 = TP3_e_vec;TP3_e_vec2(TP3_e_vec == 3) = 2;
+
+[DE_genes_e,DE_genes_pvals_e,DE_genes_names_e] = DE_genes_pvals(TP3_e_tpm,TP3_e_vec2,gene_names_correct,0.0001);
+
+genes_diff = DE_genes_e(1:9,:);
+genes_diff_i = genes_diff(:);
+genes_diff_names = gene_names_correct(genes_diff_i);
+
+[i,xi] = sort(TP3_e_vec2);
+mat = TP3_e_tpm(genes_diff_i,:);
+zmat = zscore(mat,0,2);
+
+figure;
+subplot(10,1,1:9);
+imagesc(smoothdata(zmat(:,xi)));
+caxis([-2 2]);
+colormap(gca,cmap_color_blind);
+set(gca,'xtick',[]);set(gca,'ytick',1:length(genes_diff_names));set(gca,'yticklabel',genes_diff_names);
+subplot(10,1,10);
+imagesc(TP3_e_vec2);
+colormap(gca,is_c);colorbar;
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_S2H_DE_heatmap.pdf' 
+end
+
+% erythrocyte tsne
+
+no_dims       = 2;
+initial_dims  = 10;
+% min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+TP3_e_log = log10(1+TP3_e_tpm);
+% info genes
+[info_genes_e,info_genes_names_e] = info_genes(TP3_e_tpm,2,2,gene_names_correct);%686
+
+Y = TP3_e_log(info_genes_e,:);
+mappedY_3e = tsne(Y',[], no_dims, initial_dims, perplexity);
+mappedY_3e2 = tsne(Y',[], no_dims, initial_dims, perplexity);
+
+figure;
+scatter(mappedY_3e2(:,1),mappedY_3e2(:,2),20,'k','filled');
+
+[coeff,score,~,~,explained,~] = pca(TP3_e_log(info_genes_e,:)');
+figure;
+scatter(score(:,1),score(:,2),20,'k','filled');
+xlabel('PC 1');ylabel('PC 2');
+
+
