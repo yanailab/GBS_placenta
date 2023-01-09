@@ -1,1 +1,890 @@
+Fig_5A = 0; % schematic
+Fig_5B = 0; % tsne colored by condition, maternal/HB exp and Y chromosome
+Fig_5C = 0; % maternal macrophage PC 1 heatmap
+Fig_5D = 0; % enrichment of PC 1 high genes
+Fig_5E = 0; % PC 1 score comparison multiple placentas
+Fig_5F = 0; % heatmap of DE genes between conditions of maternal macrophages
+Fig_5H = 0; % baxplot of target and regulator expression
+
+if Fig_5B
+%% load data
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+load prepare_the_data/ex_vivo/macs_subtypes.mat
+%% colors
+c1a = brewermap(8,'Pastel2');c1 = c1a(8,:);
+c2a = brewermap(9,'PuOr');c2 = c2a(8,:);
+fetal_colors = vertcat(c1,c2);
+%% filtering that will be repeated in S5 but need to run this section
+Y_chr = readtable('human_Y_chr.txt');
+Y_chr_names =  table2array(Y_chr(:,1));
+Y_chr_ind = ismember(gene_names,Y_chr_names);
+
+% binarize Y chromosome expressing cells
+fetal = sum(gg_log(Y_chr_ind,:))>0.4;sum(fetal)
+
+[info_genes_gg,info_genes_names_gg] = info_genes(gg_tpm,2,2,gene_names);%324
+clust_gg = cluster((linkage(pdist(gg_log(info_genes_gg,:)'),'ward')),6);
+
+% figure;
+% gscatter(mappedY_gg(:,1),mappedY_gg(:,2),clust_gg,brewermap(6,'Dark2'),'.',10);
+% set(gca,'visible','off');
+
+% isolate maternal
+hb = clust_gg == 3;
+mat = ~hb;
+
+mat_raw = gg_raw(:,mat);
+mat_tpm = gg_tpm(:,mat);
+mat_log = gg_log(:,mat);
+mat_vec = gg_vec(mat);
+
+% remove maternal Y chromosome ones:
+mat_f = mat & fetal';
+%% plac A tsne colored by condition, subtypes, Y chromosome
+% remove ambiguous spots
+coords_g  = mappedY_gg(~mat_f,:);
+
+raw_g = gg_raw(:,~mat_f);
+tpm_g = gg_tpm(:,~mat_f);
+log_g = gg_log(:,~mat_f);
+vec_g = gg_vec(~mat_f);
+fetal_g = fetal(~mat_f);
+
+figure;
+scatter(coords_g(:,1),coords_g(:,2),20,'k','filled');
+
+r = randperm(length(vec_g));
+
+figure;
+subplot(2,2,1)
+scatter(coords_g(r,1),coords_g(r,2),4,vec_g(r),'filled');
+set(gca,'visible','off');colormap(tx_colors);
+
+print -painters -depsc 'Fig_5B_condition.pdf' 
+
+cluster_genes = [DE_genes_c(:,1),DE_genes_c(:,3)];
+cluster_genes_label = {'hofbauer','maternal'};
+
+figure;
+for f = 1:length(cluster_genes_label)
+    subplot(2,2,f)
+    scatter(coords_g(r,1),coords_g(r,2),4,sum(log_g(cluster_genes(:,f),r)),'filled');
+    title(cluster_genes_label(f));
+%     colorbar;
+    set(gca,'visible','off');colormap(cmap_color_blind);
+end
+print -painters -depsc 'Fig_5B_subtypes.pdf' 
+
+% y chromosome exp
+figure;
+subplot(2,2,1)
+scatter(coords_g(:,1),coords_g(:,2),4,fetal_g,'filled');
+set(gca,'visible','off');colormap(fetal_colors);
+print -painters -depsc 'Fig_5B_fetal.pdf' 
+%% save Fig_5B data
+mat_f_mat_size = mat_f(mat);
+mat_tpm_g = mat_tpm(:,~mat_f_mat_size);
+mat_log_g = mat_log(:,~mat_f_mat_size);
+mat_vec_g = mat_vec(~mat_f_mat_size);
+save Fig_5B_data.mat mat_tpm_g mat_log_g mat_vec_g;
+end
+
+if Fig_5C
+%% load data
+load Fig_5B_data.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+load pc_score_colors.mat
+%% heatmap of PC 1 genes
+[info_genes_ggm,info_genes_names_ggm] = info_genes(mat_tpm_g,2,2,gene_names);%303
+[coeff,score,~,~,explained,~] = pca(mat_log_g(info_genes_ggm,:)');
+
+thresh_coeff = sqrt(1/(sum(info_genes_ggm,1)));
+pc = 1;
+%select genes with high coefficients
+genes_hi_coeff = (coeff(:,pc)) > thresh_coeff;
+a = info_genes_names_ggm(genes_hi_coeff)
+
+% take the coefficients of these genes
+coeff1 = coeff(:,1)
+coeff1_hi_ind = coeff1(genes_hi_coeff);
+
+[k,fk] = sort(coeff1_hi_ind,'descend');
+%bookmark
+
+% order them by their coefficients
+coeff_vec = NaN(size(a));
+for c = 1:length(a)
+    [~,~,coeff_vec(c)] = intersect(a(c),gene_names);
+end
+% now theyre in the order of a so need to reorder by coefficient sort
+coeff_vec_sort = coeff_vec(fk);
+
+genes = gene_names(coeff_vec_sort);
+
+mat = mat_tpm_g(coeff_vec_sort,:);
+matz = zscore(mat,0,2);
+scores1 = score(:,1);
+[i,xi] = sort(scores1,'ascend');
+
+figure;
+subplot(10,1,1:8);
+imagesc(matz(:,xi));
+caxis([-2 2]);colormap(gca,cmap_color_blind);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(genes));set(gca,'yticklabel',genes);
+subplot(10,1,9);
+imagesc(mat_vec_g(xi));colormap(gca,tx_colors);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+subplot(10,1,10);
+imagesc(scores1(xi)');set(gca,'xtick',[]);set(gca,'ytick',[]);colormap(gca,parula);
+colormap(gca,pc_score_colors);
+
+print -painters -depsc 'Fig_5C_heatmap_coeff.pdf'
+%% generate coefficient and pval vec
+% just display coefficients sorted
+[grad,im]=colorGradient([47,58,111],[240, 240, 240],128)
+
+figure;
+subplot(1,10,1:2);
+imagesc(coeff1_hi_ind(fk));colormap(grad);
+
+print -painters -depsc 'Fig_5C_coeff_vec.pdf'
+
+zmat2 = zscore(mat_tpm_g,0,2);
+
+vec = NaN(size(genes));
+for v = 1:length(genes)
+    gene = strmatch(genes(v),gene_names,'exact')
+    [~,p] = ttest2((zmat2(gene,mat_vec_g == 2)),(zmat2(gene,mat_vec_g == 3)))
+    vec(v) = p;
+end
+
+
+c1 = [236, 112, 99];
+c2 = [240 240 240];
+depth = 128;
+[grad,im]=colorGradient(c1,c2,depth);
+
+figure;
+subplot(1,10,8:10);
+imagesc(-log(vec));colorbar;
+caxis([0 50]);colormap(grad);colorbar;
+
+print -painters -depsc 'Fig_5C_pval.pdf'
+%% save Fig_5C data
+mm_pc1_high_gene_names = a;
+scores_mmh = score;
+save Fig_5C_data.mat mm_pc1_high_gene_names scores_mmh;
+end
+
+if Fig_5D
+%% load data
+load Fig_5C_data.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat gene_names
+load prepare_the_data/ex_vivo/GO_human_mat_10X.mat GO_mat_human_50_10X GO_names_50_10X
+%% GO enrichment on PC 1 high genes
+a_ind = ismember(gene_names,mm_pc1_high_gene_names);
+
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(a_ind,p_thresh_go, GO_mat_human_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:10);
+    
+figure;
+barh(flip(-log10(Pvals(p1)')),'k');
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+set(gca,'Fontsize',14);
+
+print -painters -depsc 'Fig_5D_GO.pdf'
+end
+
+if Fig_5E
+%% load data
+load Fig_5B_data.mat
+load Fig_5C_data.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+load prepare_the_data/ex_vivo/macs_subtypes.mat;
+load prepare_the_data/ex_vivo/hpm_F_r1_g.mat;
+load prepare_the_data/ex_vivo/hpm_E_g.mat;
+load prepare_the_data/cmap_color_blind.mat
+%% placenta A boxplot
+scores1 = scores_mmh(:,1);
+[h,p] = ttest2(scores1(mat_vec_g == 2),scores1(mat_vec_g == 3))
+
+tx_label = {'control','KO','WT'};
+mat_vec_g2 = mat_vec_g;
+mat_vec_g2(mat_vec_g == 1) = 4;
+tx_colors2 = vertcat(tx_colors(2,:),tx_colors(3,:),tx_colors(1,:));
+tx_label3 = {'KO','WT','control'};
+
+figure;
+b = boxplot(scores1,mat_vec_g2,'colors',tx_colors2,'orientation','horizontal','widths',0.25,'Symbol','+');
+set(b,{'linew'},{2})
+set(gca,'ytick',1:length(tx_label3));
+set(gca,'yticklabel',tx_label3);
+set(gca,'Fontsize',15);
+
+print -painters -depsc 'Fig_5E_boxplot_rep_A.pdf'
+%% placenta B analysis and boxplot (repeat with S5 to generate figure panel)
+
+% look at maternal vs fetal
+cluster_genes = [DE_genes_c(:,1),DE_genes_c(:,3)];
+cluster_genes_label = {'hofbauer','maternal'};
+
+figure;
+for f = 1:length(cluster_genes_label)
+    subplot(2,2,f)
+    scatter(mappedY_fr1g(:,1),mappedY_fr1g(:,2),7,sum(fr1_g_log(cluster_genes(:,f),:)),'filled');
+    title(cluster_genes_label(f));
+    %     colorbar;
+    %     set(gca,'visible','off');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+
+% cluster
+[info_genes_fr1,info_genes_names_fr1] = info_genes(fr1_g_tpm,2,2,gene_names);%371
+
+clust_fr1 = cluster((linkage(pdist(fr1_g_log(info_genes_fr1,:)'),'ward')),5);
+
+figure;
+scatter(mappedY_fr1g(:,1),mappedY_fr1g(:,2),20,clust_fr1,'filled');
+colormap(brewermap(5,'Spectral'));
+
+% isolate maternal
+fetal = clust_fr1 == 1;
+maternal = ~fetal;
+
+mat_tpm = fr1_g_tpm(:,maternal);
+mat_log = fr1_g_log(:,maternal);
+mat_vec = fr1_g_vec(maternal);
+
+% pc score analysis
+[info_genes_m,info_genes_names_m] = info_genes(mat_tpm,2,2,gene_names);%353
+
+[coeff,score,~,~,explained,~] = pca(mat_log(info_genes_m,:)');
+
+scores1 = score(:,1);
+
+tx_label = {'control','KO','WT'};
+
+mat_vec2 = mat_vec;
+mat_vec2(mat_vec == 1) = 4;
+
+tx_colors3 = vertcat(tx_colors(2,:),tx_colors(3,:),tx_colors(1,:));
+tx_label3 = {'KO','WT','control'};
+figure;
+b = boxplot(scores1,mat_vec2,'colors',tx_colors3,'orientation','horizontal','widths',0.25,'Symbol','+');
+set(b,{'linew'},{2})
+set(gca,'ytick',1:length(tx_label3));
+set(gca,'yticklabel',tx_label3);
+set(gca,'Fontsize',15);
+
+print -painters -depsc 'Fig_5E_boxplot_rep_B.pdf'
+
+[h,p] = ttest2(scores1(mat_vec == 2),scores1(mat_vec == 3))
+%% placenta C analysis and boxplot (repeat with S5 to generate figure panel)
+cluster_genes = [DE_genes_c(:,1),DE_genes_c(:,3)];
+cluster_genes_label = {'hofbauer','maternal'};
+
+figure;
+for f = 1:length(cluster_genes_label)
+    subplot(2,2,f)
+    scatter(mappedY_eg(:,1),mappedY_eg(:,2),7,sum(e_g_log(cluster_genes(:,f),:)),'filled');
+    title(cluster_genes_label(f));
+    %     colorbar;
+    %     set(gca,'visible','off');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+
+% cluster
+[info_genes_e,info_genes_names_e] = info_genes(e_g_tpm,2,2,gene_names);%427
+
+clust_e = cluster((linkage(pdist(e_g_log(info_genes_e,:)'),'ward')),3);
+% 
+% figure;
+% scatter(mappedY_eg(:,1),mappedY_eg(:,2),20,clust_e,'filled');
+% colormap(brewermap(3,'Spectral'));
+
+% isolate maternal
+fetal = clust_e == 1;
+maternal = ~fetal;
+
+mat_tpm = e_g_tpm(:,maternal);
+mat_log = e_g_log(:,maternal);
+mat_vec = e_g_vec(maternal);
+
+% pc score analysis
+[info_genes_m,info_genes_names_m] = info_genes(mat_tpm,2,2,gene_names);%353
+
+[coeff,score,~,~,explained,~] = pca(mat_log(info_genes_m,:)');
+
+scores1 = score(:,1);
+
+tx_label = {'control','KO','WT'};
+
+mat_vec2 = mat_vec;
+mat_vec2(mat_vec == 1) = 4;
+
+tx_colors3 = vertcat(tx_colors(2,:),tx_colors(3,:),tx_colors(1,:));
+tx_label_3 = {'KO','WT','control'};
+
+figure;
+b = boxplot(scores1,mat_vec2,'colors',tx_colors3,'orientation','horizontal','widths',0.25,'Symbol','+');
+set(b,{'linew'},{2})
+set(gca,'ytick',1:length(tx_label3));
+set(gca,'yticklabel',tx_label3);
+set(gca,'Fontsize',15);
+
+print -painters -depsc 'Fig_5E_boxplot_rep_C.pdf'
+
+[h,p] = ttest2(scores1(mat_vec == 2),scores1(mat_vec == 3))
+end
+
+if Fig_5F
+%% load data
+load Fig_5B_data.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+%% heatmap of DE genes between 
+[DE_genes_mg,DE_genes_pvals_mg,DE_genes_names_mg] = DE_genes_pvals(mat_tpm_g,mat_vec_g,gene_names,0.0001);
+
+top_genes = DE_genes_mg(1:10,:);
+top_genes_list = top_genes(:);
+
+top_names = DE_genes_names_mg(1:10,:);
+top_names_list = top_names(:);
+
+mat = mat_tpm_g(top_genes_list,:);
+mat_z = zscore(mat,0,2);
+
+x1 = max(find(mat_vec_g == 1))
+x2 = max(find(mat_vec_g == 2))
+
+figure;
+subplot(10,1,1:9);
+imagesc(mat_z);
+colormap(gca,cmap_color_blind);set(gca,'xtick',[]);
+caxis([-2 2]);
+set(gca,'ytick',1:length(top_names_list));set(gca,'yticklabel',top_names_list);
+yline(10.5,'k','Linewidth',1);
+yline(20.5,'k','Linewidth',1);
+xline(x1,'k','Linewidth',1); 
+xline(x2,'k','Linewidth',1); 
+subplot(10,1,10);
+imagesc(mat_vec_g);set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(gca,tx_colors);
+print -painters -depsc 'Fig_5F.pdf' 
+end
+
+if Fig_5H
+%% load data
+load Fig_5B_data.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+%% boxplot of regulators and targets
+downstream = readtable('downstream_human_targets');downstream_ind = ismember(gene_names,downstream{:,1});
+
+upstream = readtable('upstream_human_targets');upstream_ind = ismember(gene_names,upstream{:,1});
+
+mat_label = {'control','KO','WT'};
+
+figure;
+boxplot(sum(mat_log_g(upstream_ind,:)),mat_vec_g,'Label',mat_label);
+set(gca,'Fontsize',14);
+title('upstream regulators');
+
+tx_label = {'control','KO','WT'};
+
+figure;
+subplot(2,2,2);
+b = boxplot(sum(mat_log_g(downstream_ind,:)),mat_vec_g,'colors',tx_colors,'widths',0.25,'Symbol','+')
+set(b,{'linew'},{2})
+set(gca,'xtick',1:length(tx_label));set(gca,'xticklabel',tx_label);
+set(gca,'Fontsize',7);title('downstream targets');
+subplot(2,2,1);
+b = boxplot(sum(mat_log_g(upstream_ind,:)),mat_vec_g,'colors',tx_colors,'widths',0.25,'Symbol','+')
+set(b,{'linew'},{2})
+set(gca,'xtick',1:length(tx_label));set(gca,'xticklabel',tx_label);
+set(gca,'Fontsize',7);
+title('upstream regulators');
+print -painters -depsc 'Fig_5G.pdf' 
+
+
+ko = sum(mat_log_g(upstream_ind,mat_vec_g == 2));
+wt = sum(mat_log_g(upstream_ind,mat_vec_g == 3));
+
+[~,p] = ttest2(ko,wt)
+
+
+
+ko = sum(mat_log_g(downstream_ind,mat_vec_g == 2));
+wt = sum(mat_log_g(downstream_ind,mat_vec_g == 3));
+
+[~,p] = ttest2(ko,wt)
+end
+
+Fig_S5A = 0; % placenta A filtering in prepare_the_data except here remove maternal Y expressing cells
+Fig_S5B = 0; % placenta A PCA colored by condition and subtype
+Fig_S5C = 0; % placenta B filtering 
+Fig_S5D = 0; % placenta C filtering 
+Fig_S5E = 0; % boxplot of PC 1 scores without Y chromosome gene expressing maternal cells removed
+Fig_S5F = 0; % boxplot of sum PC 1 gene expression
+Fig_S5G = 0; % placenta B PC score analysis
+Fig_S5H = 0; % placenta C PC score analysis
+Fig_S5I = 0; % luminex in prism
+
+if Fig_S5A
+%% load data 
+load prepare_the_data/ex_vivo/mappedY_gg
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+load prepare_the_data/ex_vivo/macs_subtypes.mat
+%% colors
+c1a = brewermap(8,'Pastel2');c1 = c1a(8,:);
+c2a = brewermap(9,'PuOr');c2 = c2a(8,:);
+fetal_colors = vertcat(c1,c2);
+%% remove Y chromosome maternal cells from placenta A - first filtering happened in prep data
+mat_label = {'control','KO','WT'};
+r = randperm(length(gg_vec));
+
+figure;
+scatter(mappedY_gg(r,1),mappedY_gg(r,2),10,gg_vec(r),'filled');
+set(gca,'visible','off');colormap(tx_colors);
+
+figure;
+scatter(score_gg(r,1),score_gg(r,2),10,gg_vec(r),'filled');
+set(gca,'visible','off');colormap(tx_colors);
+
+cluster_genes = [DE_genes_c(:,1),DE_genes_c(:,3)];
+cluster_genes_label = {'hofbauer','maternal'};
+
+figure;
+for f = 1:length(cluster_genes_label)
+    subplot(2,2,f)
+    scatter(mappedY_gg(r,1),mappedY_gg(r,2),7,sum(gg_log(cluster_genes(:,f),r)),'filled');
+    title(cluster_genes_label(f));
+    %     colorbar;
+    %     set(gca,'visible','off');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+print -painters -depsc 'Fig_S5A_PCA_subtypes.pdf' 
+
+% y chromosome exp
+Y_chr = readtable('human_Y_chr.txt');
+Y_chr_names =  table2array(Y_chr(:,1));
+% lose 90% of the genes here
+Y_chr_ind = ismember(gene_names,Y_chr_names);
+
+% binarize Y chromosome expressing cells
+fetal = sum(gg_log(Y_chr_ind,:))>0.4;sum(fetal)
+
+% just to visualize
+figure;
+scatter(mappedY_gg(:,1),mappedY_gg(:,2),10,fetal,'filled');
+set(gca,'visible','off');colormap(fetal_colors);
+
+[info_genes_gg,info_genes_names_gg] = info_genes(gg_tpm,2,2,gene_names);%324
+clust_gg = cluster((linkage(pdist(gg_log(info_genes_gg,:)'),'ward')),6);
+
+figure;
+gscatter(mappedY_gg(r,1),mappedY_gg(r,2),clust_gg(r),brewermap(6,'Dark2'),'.',10);
+set(gca,'visible','off');
+
+% isolate maternal
+hb = clust_gg == 3;
+mat = ~hb;
+
+mat_raw = gg_raw(:,mat);
+mat_tpm = gg_tpm(:,mat);
+mat_log = gg_log(:,mat);
+mat_vec = gg_vec(mat);
+
+% remove maternal Y chromosome ones:
+% this is a vector of mat + fetal in the size of both subtypes
+mat_f = mat & fetal'
+% this is a vector of mat_f to filter out in the size of maternal
+mat_f_mat_size = mat_f(mat);
+
+figure;
+scatter(mappedY_gg(:,1),mappedY_gg(:,2),30,mat_f,'filled');
+colormap(fetal_colors);
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_S5A_fetal_maternal_remove.pdf'
+end
+
+if Fig_S5B
+%% load data
+load prepare_the_data/ex_vivo/mappedY_gg
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/macs_subtypes.mat
+%% PCA colored by condition and subtype
+r = randperm(length(gg_vec));
+   
+figure;
+subplot(2,2,1);
+scatter(score_gg(r,1),score_gg(r,2),7,gg_vec(r),'filled');
+colormap(tx_colors);
+set(gca,'visible','off');
+
+print -painters -depsc 'Fig_S5B_PCA_conditions.pdf' 
+
+cluster_genes = [DE_genes_c(:,1),DE_genes_c(:,3)];
+cluster_genes_label = {'hofbauer','maternal'};
+
+figure;
+for f = 1:length(cluster_genes_label)
+    subplot(2,2,f)
+    scatter(score_gg(r,1),score_gg(r,2),7,sum(gg_log(cluster_genes(:,f),r)),'filled');
+    title(cluster_genes_label(f));
+    %     colorbar;
+    %     set(gca,'visible','off');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+
+print -painters -depsc 'Fig_S5B_PCA_subtypes.pdf' 
+end
+
+if Fig_S5C % first step of filtering in prepare the data
+%% load data
+load prepare_the_data/ex_vivo/macs_subtypes.mat
+load prepare_the_data/ex_vivo/hpm_F_r1_g.mat;
+load prepare_the_data/cmap_color_blind.mat
+%% tsne colored by maternal vs fetal
+cluster_genes = [DE_genes_c(:,1),DE_genes_c(:,3)];
+cluster_genes_label = {'hofbauer','maternal'};
+
+figure;
+for f = 1:length(cluster_genes_label)
+    subplot(2,2,f)
+    scatter(mappedY_fr1g(:,1),mappedY_fr1g(:,2),7,sum(fr1_g_log(cluster_genes(:,f),:)),'filled');
+    title(cluster_genes_label(f));
+    %     colorbar;
+    %     set(gca,'visible','off');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+print -painters -depsc 'Fig_S5C_tsne_subtype.pdf' 
+%% cluster and save data for S5G
+% cluster
+[info_genes_fr1,info_genes_names_fr1] = info_genes(fr1_g_tpm,2,2,gene_names);%371
+
+clust_fr1 = cluster((linkage(pdist(fr1_g_log(info_genes_fr1,:)'),'ward')),5);
+
+figure;
+scatter(mappedY_fr1g(:,1),mappedY_fr1g(:,2),20,clust_fr1,'filled');
+colormap(brewermap(5,'Spectral'));
+
+% isolate maternal
+fetal = clust_fr1 == 1;
+maternal = ~fetal;
+
+mat_tpm_B = fr1_g_tpm(:,maternal);
+mat_log_B = fr1_g_log(:,maternal);
+mat_vec_B = fr1_g_vec(maternal);
+save S5C_data.mat mat_tpm_B mat_log_B mat_vec_B;
+end
+
+if Fig_S5D % first step of filtering in prepare the data
+%% load data
+load prepare_the_data/ex_vivo/macs_subtypes.mat
+load prepare_the_data/ex_vivo/hpm_E_g.mat;
+load prepare_the_data/cmap_color_blind.mat
+%% tsne colored by maternal vs fetal
+cluster_genes = [DE_genes_c(:,1),DE_genes_c(:,3)];
+cluster_genes_label = {'hofbauer','maternal'};
+
+figure;
+for f = 1:length(cluster_genes_label)
+    subplot(2,2,f)
+    scatter(mappedY_eg(:,1),mappedY_eg(:,2),7,sum(e_g_log(cluster_genes(:,f),:)),'filled');
+    title(cluster_genes_label(f));
+    %     colorbar;
+    %     set(gca,'visible','off');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+print -painters -depsc 'Fig_S5D_tsne_subtype.pdf' 
+%% cluster and save data for S5H
+[info_genes_e,info_genes_names_e] = info_genes(e_g_tpm,2,2,gene_names);%427
+
+clust_e = cluster((linkage(pdist(e_g_log(info_genes_e,:)'),'ward')),3);
+
+figure;
+scatter(mappedY_eg(:,1),mappedY_eg(:,2),20,clust_e,'filled');
+colormap(brewermap(3,'Spectral'));
+
+% isolate maternal
+fetal = clust_e == 1;
+maternal = ~fetal;
+
+mat_tpm_C = e_g_tpm(:,maternal);
+mat_log_C = e_g_log(:,maternal);
+mat_vec_C = e_g_vec(maternal);
+save S5D_data.mat mat_tpm_C mat_log_C mat_vec_C;    
+end
+
+if Fig_S5E 
+%% load data
+load prepare_the_data/ex_vivo/tx_colors.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat gene_names
+load plac_A_mat_data_for_analysis.mat
+load prepare_the_data/ex_vivo/GO_human_mat_10X.mat GO_mat_human_50_10X GO_names_50_10X
+%% boxplot of PC 1 scores
+[info_genes_m,info_genes_names_m] = info_genes(mat_tpm,2,2,gene_names);%308
+[coeff,score,~,~,explained,~] = pca(mat_log(info_genes_m,:)');
+
+figure;
+scatter(score(:,1),score(:,2),30,mat_vec,'filled');
+colormap(tx_colors);
+set(gca,'visible','off');
+
+scores1 = score(:,1);
+
+mat_vec_g2 = mat_vec;
+mat_vec_g2(mat_vec == 1) = 4;
+tx_colors2 = vertcat(tx_colors(2,:),tx_colors(3,:),tx_colors(1,:));
+tx_label3 = {'KO','WT','control'};
+
+figure;
+b = boxplot(scores1,mat_vec_g2,'colors',tx_colors2,'orientation','horizontal','widths',0.25,'Symbol','+');
+set(b,{'linew'},{2})
+set(gca,'ytick',1:length(tx_label3));
+set(gca,'yticklabel',tx_label3);
+set(gca,'Fontsize',15);
+
+print -painters -depsc 'Fig_S5E_boxplot_with_fetal.pdf'
+[~,p] = ttest2(scores1(mat_vec_g2 == 3), scores1(mat_vec_g2 == 4))
+%% GO enrichment
+thresh_coeff = sqrt(1/(sum(info_genes_m,1)));
+pc = 1;
+%select high and low genes
+genes_hi_coeff = (coeff(:,pc)) > thresh_coeff;
+genes_low_coeff = (coeff(:,pc))<(-thresh_coeff);
+a = info_genes_names_m(genes_hi_coeff)
+a_ind = ismember(gene_names,a);
+
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(a_ind,p_thresh_go, GO_mat_human_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:10);
+    
+figure;
+barh(flip(-log10(Pvals(p1)')),'k');
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+set(gca,'Fontsize',14);
+
+print -painters -depsc 'Fig_S5E_GO.pdf'
+end
+
+if Fig_S5F
+%% load data
+
+load Fig_5B_data.mat
+load Fig_5C_data.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat gene_names
+% load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+% load pc_score_colors.mat
+%% boxplot of maternal PC 1 genes
+a_ind = ismember(gene_names,mm_pc1_high_gene_names);
+a_names = gene_names(a_ind);
+mat = mat_tpm_g(a_ind,:);
+mat_z = zscore(mat,0,2);
+
+figure;
+b =  boxplot(sum(mat_z),mat_vec_g,'colors',tx_colors,'widths',0.25,'Symbol','+');
+set(b,{'linew'},{2})
+xlim([-1 5]);
+print -painters -depsc 'Fig_S5F_sum_pc1_genes.pdf'
+
+[h,p] = ttest2(sum(mat_z(:,mat_vec_g == 2)),sum(mat_z(:,mat_vec_g == 3)))
+end  
+
+if Fig_S5G
+%% load data
+load S5C_data.mat
+load pc_score_colors.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat gene_names
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+%% pc score analysis
+[info_genes_m,info_genes_names_m] = info_genes(mat_tpm_B,2,2,gene_names);%353
+
+[coeff,score,~,~,explained,~] = pca(mat_log_B(info_genes_m,:)');
+
+thresh_coeff = sqrt(1/(sum(info_genes_m,1)));
+pc = 1;
+%select high and low genes
+genes_hi_coeff = (coeff(:,pc)) > thresh_coeff;
+a = info_genes_names_m(genes_hi_coeff)
+
+coeff1 = coeff(:,1)
+coeff1_hi = coeff1(genes_hi_coeff);
+
+[k,fk] = sort(coeff1_hi,'descend');
+
+coeff_vec = NaN(size(a));
+for c = 1:length(a)
+    [~,~,coeff_vec(c)] = intersect(a(c),gene_names);
+end
+
+coeff_vec_sort = coeff_vec(fk);
+
+genes = gene_names(coeff_vec(fk));
+mat = mat_tpm_B(coeff_vec_sort,:);
+matz = zscore(mat,0,2);
+scores1 = score(:,1);
+[i,xi] = sort(scores1,'ascend');
+
+figure;
+subplot(10,1,1:8);
+imagesc(matz(:,xi));
+caxis([-2 2]);colormap(gca,cmap_color_blind);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(genes));set(gca,'yticklabel',genes);
+subplot(10,1,9);
+imagesc(mat_vec_B(xi));colormap(gca,tx_colors);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+subplot(10,1,10);
+imagesc(scores1(xi)');set(gca,'xtick',[]);set(gca,'ytick',[]);colormap(gca,parula);
+colormap(gca,pc_score_colors);
+
+print -painters -depsc 'Fig_S5G_heatmap_coeff.pdf'
+%% generate coeff vec and pval vec
+
+coeff_vec_sort_values = coeff1_hi(fk);
+
+[grad,im]=colorGradient([47,58,111],[240, 240, 240],128)
+
+figure;
+subplot(1,10,8:10);
+imagesc(coeff_vec_sort_values);
+colormap(grad);
+
+print -painters -depsc 'Fig_s5g_coeff_vec.pdf'
+
+zmat2 = zscore(mat_tpm_B,0,2);
+% now pval vec
+vec = NaN(size(coeff_vec_sort_values));
+for v = 1:length(genes)
+    gene = strmatch(genes(v),gene_names,'exact')
+    [~,p] = ttest2((zmat2(gene,mat_vec_B == 2)),(zmat2(gene,mat_vec_B == 3)))
+    vec(v) = p;
+end
+
+
+c1 = [236, 112, 99];
+c2 = [240 240 240];
+depth = 128;
+[grad,im]=colorGradient(c1,c2,depth);
+
+figure;
+subplot(1,10,8:10);
+imagesc(-log(vec));colorbar;
+caxis([0 100]);colormap(grad);colorbar;
+
+print -painters -depsc 'Fig_S5G_pval.pdf'
+end
+
+if Fig_S5H
+%% load data
+load S5D_data.mat
+load pc_score_colors.mat
+load prepare_the_data/ex_vivo/hpm_F_r2_gg.mat gene_names
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/ex_vivo/tx_colors.mat
+%% pc score analysis
+[info_genes_m,info_genes_names_m] = info_genes(mat_tpm_C,2,2,gene_names);%353
+
+[coeff,score,~,~,explained,~] = pca(mat_log_C(info_genes_m,:)');
+
+thresh_coeff = sqrt(1/(sum(info_genes_m,1)));
+pc = 1;
+%select high and low genes
+genes_hi_coeff = (coeff(:,pc)) > thresh_coeff;
+a = info_genes_names_m(genes_hi_coeff)
+
+coeff1 = coeff(:,1)
+coeff1_hi = coeff1(genes_hi_coeff);
+
+[k,fk] = sort(coeff1_hi,'descend');
+
+coeff_vec = NaN(size(a));
+for c = 1:length(a)
+    [~,~,coeff_vec(c)] = intersect(a(c),gene_names);
+end
+
+coeff_vec_sort = coeff_vec(fk);
+
+genes = gene_names(coeff_vec(fk));
+mat = mat_tpm_C(coeff_vec_sort,:);
+matz = zscore(mat,0,2);
+scores1 = score(:,1);
+[i,xi] = sort(scores1,'ascend');
+
+figure;
+subplot(10,1,1:8);
+imagesc(matz(:,xi));
+caxis([-2 2]);colormap(gca,cmap_color_blind);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(genes));set(gca,'yticklabel',genes);
+subplot(10,1,9);
+imagesc(mat_vec_C(xi));colormap(gca,tx_colors);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+subplot(10,1,10);
+imagesc(scores1(xi)');set(gca,'xtick',[]);set(gca,'ytick',[]);colormap(gca,parula);
+colormap(gca,pc_score_colors);
+
+print -painters -depsc 'Fig_S5H_heatmap_coeff.pdf'
+%% generate coeff vec and pval vec
+
+coeff_vec_sort_values = coeff1_hi(fk);
+
+[grad,im]=colorGradient([47,58,111],[240, 240, 240],128)
+
+figure;
+subplot(1,10,8:10);
+imagesc(coeff_vec_sort_values);
+colormap(grad);
+
+print -painters -depsc 'Fig_S5H_coeff_vec.pdf'
+
+zmat2 = zscore(mat_tpm_C,0,2);
+% now pval vec
+vec = NaN(size(coeff_vec_sort_values));
+for v = 1:length(genes)
+    gene = strmatch(genes(v),gene_names,'exact')
+    [~,p] = ttest2((zmat2(gene,mat_vec_C == 2)),(zmat2(gene,mat_vec_C == 3)))
+    vec(v) = p;
+end
+
+
+c1 = [236, 112, 99];
+c2 = [240 240 240];
+depth = 128;
+[grad,im]=colorGradient(c1,c2,depth);
+
+figure;
+subplot(1,10,8:10);
+imagesc(-log(vec));colorbar;
+caxis([0 100]);colormap(grad);colorbar;
+
+print -painters -depsc 'Fig_S5H_pval.pdf'
+end
 
