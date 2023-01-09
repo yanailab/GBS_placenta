@@ -1,1 +1,1210 @@
 
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381
+382
+383
+384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539
+540
+541
+542
+543
+544
+545
+546
+547
+548
+549
+550
+551
+552
+553
+554
+555
+556
+557
+558
+559
+560
+561
+562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572
+573
+574
+575
+576
+577
+578
+579
+580
+581
+582
+583
+584
+585
+586
+587
+588
+589
+590
+591
+592
+593
+594
+595
+596
+597
+598
+599
+600
+601
+602
+603
+604
+Fig_3A = 0; % PCA on TP3 neutrophils colored by markers
+Fig_3B = 0; % GO enrichment on PC2 high genes
+Fig_3C = 0; % PCA colored by condition with barplot of PC2 scores
+Fig_3D = 0; % Heatmap of PC2 genes
+Fig_3E = 0; % PC2 scores by time point
+
+if Fig_3A
+%% load data
+load prepare_the_data/cmap_color_blind.mat;
+load prepare_the_data/in_vivo_E/TP3_nm.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+%% remove sham cells
+sham_nl3 = TP3_nl_tx_vec == 1;
+good_nl3 = ~sham_nl3;
+
+% remake everything else for working mats
+good_log_n3 = TP3_nl_log(:,good_nl3);
+good_tpm_n3 = TP3_nl_tpm(:,good_nl3);
+good_tx_vec_n3 = TP3_nl_tx_vec(good_nl3);
+good_tx_vec2_n3 = good_tx_vec_n3 - 1;
+
+tx_colors2 = tx_colors(2:3,:);
+tx_labels2 = {'KO','WT'};
+%% 3A: 48h neutrophil PCA colored by genes
+[info_genes_ng,info_genes_names_ng] = info_genes(good_tpm_n3,2,2,gene_names_correct);%464
+[coeff,score,~,~,explained,~] = pca(good_log_n3(info_genes_ng,:)');
+
+r_n = randperm(length(good_tx_vec_n3));
+
+genes = {'Slpi','S100a9','Il1a'};
+
+figure;
+for g = 1:length(genes)
+    subplot(2,2,g)
+    gene = strmatch(genes(g),gene_names_correct,'exact');
+    scatter(score(r_n,1),score(r_n,2),10,good_log_n3(gene,r_n),'filled');
+    %title(genes(g));
+    set(gca,'visible','off');
+    colormap(cmap_color_blind);
+end
+
+print -painters -depsc 'Fig_3A_genes.pdf'
+%% save PCA data
+score_n = score;
+coeff_n = coeff;
+save Fig_3A_data.mat r_n score_n coeff_n info_genes_ng info_genes_names_ng good_log_n3 good_tpm_n3 ...
+    good_tx_vec_n3 good_tx_vec2_n3 tx_colors2 tx_labels2 ;
+end
+
+if Fig_3B
+%% load data
+load Fig_3A_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct;
+load prepare_the_data/in_vivo_E/GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X;
+%% 3B: GO enrichment of PC2 high genes
+thresh_coeff = sqrt(1/(sum(info_genes_ng)));
+pc = 2;
+%select high and low genes
+genes_hi_coeff = (coeff_n(:,pc)) > thresh_coeff;
+%genes_low_coeff = (coeff(:,pc))<(-thresh_coeff);
+a = info_genes_names_ng(genes_hi_coeff)
+a_ind = ismember(gene_names_correct,a);
+% look at enrichment
+genes = ismember(gene_names_correct,a);
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(genes,p_thresh_go, GO_mat_mouse_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:8);
+    
+figure;
+barh(flip(-log10(Pvals(p1)')),'k');
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+set(gca,'Fontsize',14);
+
+print -painters -depsc 'Fig_3B_enrichment.pdf'
+end
+
+if Fig_3C
+%% load data
+load Fig_3A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+%% 3C: PCA colored by condition
+% plot as scatter
+figure;
+subplot(2,2,1)
+scatter(score_n(r_n,1),score_n(r_n,2),10,good_tx_vec_n3(r_n),'filled');
+colormap(tx_colors2);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_3C_PCA.pdf'
+
+% save as gscatter to produce legend
+figure;
+subplot(2,2,1)
+gscatter(score_n(r_n,1),score_n(r_n,2),good_tx_vec_n3(r_n),tx_colors2,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend(tx_labels2);
+print -painters -depsc 'Fig_3C_PCA_legend.pdf'
+%% 3C: PCA colored by boxplot
+scores2 = score_n(:,2);
+scores2_k = scores2(good_tx_vec_n3 == 2);
+scores2_w = scores2(good_tx_vec_n3 == 3);
+
+[h,p] = ttest2(scores2_k,scores2_w)
+
+x = 1;
+x2 = 1.2;
+
+figure;
+b = boxplot(scores2(good_tx_vec_n3 == 2),'positions',x,'colors',tx_colors(2,:),'widths',0.10);
+set(b,{'linew'},{2});hold on;
+b2 = boxplot(scores2(good_tx_vec_n3 == 3),'positions',x2,'colors',tx_colors(3,:),'widths',0.10);
+set(b2,{'linew'},{2});ylim([-6 6]);
+%set(gca,'visible','off');
+print -painters -depsc 'Fig_3C_scores_boxplot.pdf'
+end
+
+if Fig_3D
+%% load data
+load pc_score_colors.mat;
+load prepare_the_data/cmap_color_blind.mat;
+load Fig_3A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+%% 3D: heatmap of PC2 high genes sorted by gene coefficient and PC2 score 
+pc = 2;
+coeff_2 = coeff_n(:,pc); % in the order of info_genes_names_ng
+[i,xi] = sort(coeff_n(:,pc),'descend');
+info_genes_names_ng_sort = info_genes_names_ng(xi);
+
+info_genes_ind = NaN(size(info_genes_names_ng_sort));
+for i = 1:length(info_genes_ind)
+    [~,~,info_genes_ind(i)] = intersect(info_genes_names_ng_sort(i),gene_names_correct);
+end
+
+top_genes = info_genes_names_ng_sort(1:25);
+top_genes_ind = info_genes_ind(1:25);
+mat = good_tpm_n3(info_genes_ind(1:25),:);
+matz = zscore(mat,0,2);
+
+% sort by PC scores
+pc2_scores = score_n(:,2);
+[y,yi] = sort(pc2_scores,'ascend');
+
+figure;
+subplot(10,1,1:8);
+imagesc(matz(:,yi));
+caxis([-3 3]);
+colormap(gca,cmap_color_blind);
+set(gca,'ytick',1:length(top_genes));set(gca,'yticklabel',top_genes);
+set(gca,'xtick',[]);set(gca,'Fontsize',12);
+subplot(10,1,9);
+imagesc(good_tx_vec_n3(yi));set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(gca,tx_colors(2:end,:));colorbar;
+%title('infection');
+subplot(10,1,10);
+imagesc(pc2_scores(yi)');set(gca,'xtick',[]);set(gca,'ytick',[]);
+title('PC 2 score');colormap(gca,pc_score_colors);
+print -painters -depsc 'Fig_3D_heatmap.pdf'
+%% generate coeff bar
+[grad,im]=colorGradient([47,58,111],[240, 240, 240],128)
+
+figure;
+subplot(1,10,9);
+imagesc(coeff_2(xi(1:25)));colormap(grad);
+print -painters -depsc 'Fig_3_coeff_vec.pdf'
+%% generate p value bar
+zmat = zscore(good_tpm_n3,0,2);
+
+vec = NaN(length(top_genes),1);
+for v = 1:length(top_genes)
+    gene = (strmatch(top_genes(v),gene_names_correct,'exact'))
+    [~,p] = ttest2(zmat(gene,good_tx_vec_n3 == 2),zmat(gene, good_tx_vec_n3 == 3));
+    vec(v) = p;        
+end
+
+
+%display colors
+c1 = [236, 112, 99];
+c2 = [240 240 240];
+depth = 128;
+[grad,im]=colorGradient(c1,c2,depth);
+
+figure;
+subplot(1,10,8:10);
+imagesc(-log(vec));colorbar;
+caxis([0 50]);colormap(grad);colorbar;
+
+print -painters -depsc 'Fig_3_sig_vec.pdf'
+%% save top genes here for EV3D
+save Fig_3D_data.mat top_genes_ind zmat;
+end
+
+if Fig_3E
+%% load data
+load Fig_3A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+load prepare_the_data/in_vivo_E/TP1_nm.mat;
+load prepare_the_data/in_vivo_E/TP2_nm.mat;
+load prepare_the_data/in_vivo_E/TP3_nm.mat;
+load prepare_the_data/in_vivo_E/TP4_nm.mat;
+%% Fig 3E: neutrophil boxplot across time points
+
+% repeat PCA here: 
+[info_genes_ng,info_genes_names_ng] = info_genes(good_tpm_n3,2,2,gene_names_correct);%464
+[coeff,score,~,~,explained,mu] = pca(good_log_n3(info_genes_ng,:)');
+
+% check: 
+figure;gscatter(score(:,1),score(:,2),good_tx_vec2_n3,tx_colors2,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend(tx_labels2);
+
+data = ((score*coeff')+mu)';
+scores_recovered = (good_log_n3(info_genes_ng,:)' - mu)/coeff';
+
+% calculate scores for other TPs
+% TP4
+n4_good = TP4_nl_tx_vec == 2|TP4_nl_tx_vec == 3;
+
+n4_log_g = TP4_nl_log(:,n4_good); 
+n4_vec_g = TP4_nl_tx_vec(n4_good);
+
+k4 = (n4_log_g(info_genes_ng,n4_vec_g == 2)' - mu)/coeff';k4_scores = k4(:,2);
+w4 = (n4_log_g(info_genes_ng,n4_vec_g == 3)' - mu)/coeff';w4_scores = w4(:,2);
+
+[~,p] = ttest2(k4_scores,w4_scores)
+%TP3
+n3_good = TP3_nl_tx_vec == 2|TP3_nl_tx_vec == 3;
+
+n3_log_g = TP3_nl_log(:,n3_good); 
+n3_vec_g = TP3_nl_tx_vec(:,n3_good);
+
+k3 = (n3_log_g(info_genes_ng,n3_vec_g == 2)' - mu)/coeff';k3_scores = k3(:,2);
+w3 = (n3_log_g(info_genes_ng,n3_vec_g == 3)' - mu)/coeff';w3_scores = w3(:,2);
+
+[~,p] = ttest2(k3_scores,w3_scores) 
+
+%TP2
+n2_good = TP2_nl_tx_vec == 2|TP2_nl_tx_vec == 3;
+
+n2_log_g = TP2_nl_log(:,n2_good); 
+n2_vec_g = TP2_nl_tx_vec(n2_good);
+
+k2 = (n2_log_g(info_genes_ng,n2_vec_g == 2)' - mu)/coeff';k2_scores = k2(:,2);
+w2 = (n2_log_g(info_genes_ng,n2_vec_g == 3)' - mu)/coeff';w2_scores = w2(:,2);
+
+[~,p] = ttest2(k2_scores,w2_scores) 
+
+%TP1
+n1_good = TP1_nl_tx_vec == 2|TP1_nl_tx_vec == 3;
+
+n1_log_g = TP1_nl_log(:,n1_good); 
+n1_vec_g = TP1_nl_tx_vec(n1_good);
+
+k1 = (n1_log_g(info_genes_ng,n1_vec_g == 2)' - mu)/coeff';k1_scores = k1(:,2);
+w1 = (n1_log_g(info_genes_ng,n1_vec_g == 3)' - mu)/coeff';w1_scores = w1(:,2);
+
+[~,p] = ttest2(k1_scores,w1_scores) 
+
+% concatenate and display
+ko_scores = vertcat(k1_scores,k2_scores,k3_scores,k4_scores);
+ko_scores_vec = repelem(1:4,[size(k1_scores,1),size(k2_scores,1),size(k3_scores,1),size(k4_scores,1)]);
+
+wt_scores = vertcat(w1_scores,w2_scores,w3_scores,w4_scores);
+wt_scores_vec = repelem(1:4,[size(w1_scores,1),size(w2_scores,1),size(w3_scores,1),size(w4_scores,1)]);
+
+time_labels = {'12h','24h','48h','72h'};
+x1 = [1,2,3,4]
+x2 = [1.3,2.3,3.3,4.3]
+
+figure;
+b = boxplot(ko_scores,ko_scores_vec,'positions',x1,'colors',tx_colors(2,:),'widths',0.25,'Symbol','+')
+set(b,{'linew'},{2})
+hold on;
+b2 = boxplot(wt_scores,wt_scores_vec,'positions',x2,'labels',time_labels,'colors',tx_colors(3,:),'widths',0.25,'Symbol','+')
+set(b2,{'linew'},{2})
+title('inflammatory enrichment');set(gca,'Fontsize',15);
+ylim([-6 6]);
+print -painters -depsc 'Fig_3E.pdf'
+%% save data for EV3F
+save Fig_3E_data.mat k1 w1 k2 w2 k3 w3 k4 w4;
+end
+
+Fig_S3A = 0; % Neutrophil PCA colored by other marker genes
+Fig_S3B = 0; % Neutrophil PC1 score comparison
+Fig_S3C = 0; % Neutrophil PCA cell cycle
+Fig_S3D = 0; % Boxplot of sum PC2 gene expression
+Fig_S3E = 0; % Heatmap of neutrophil DE genes
+Fig_S3F = 0; % PC2 projections at each time point
+Fig_S3G = 0; % PCA of neutrophils at 72h 
+Fig_S3H = 0; % Heatmap of neutrophils at 72h post infection
+
+if Fig_S3A
+%% load data
+load Fig_3A_data.mat
+load prepare_the_data/cmap_color_blind.mat;
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+%% PCA colored by other marker genes
+genes_n = {'Neat1','Fcer1g','S100a8'};
+
+figure;
+for f = 1:length(genes_n)
+    gene = strmatch(genes_n(f),gene_names_correct,'exact')
+    subplot(2,3,f)
+    scatter(score_n(:,1),score_n(:,2),10,good_log_n3(gene,:),'filled');
+    title(genes_n(f));
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+
+print -painters -depsc 'Fig_S3A_PCA.pdf'
+end
+
+if Fig_S3B
+%% load data
+load Fig_3A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat;
+load prepare_the_data/in_vivo_E/gene_names_correct;
+%% PC 1 score comparisson (PCA colored by condition is already in 3A)
+figure;
+subplot(2,2,1)
+scatter(score_n(r_n,1),score_n(r_n,2),10,good_tx_vec_n3(r_n),'filled');
+colormap(tx_colors2);
+set(gca,'visible','off');
+print -painters -depsc 'Fig_3A_PCA.pdf'
+
+scores1 = score_n(:,1);
+
+% boxplot
+x = 1;x2 = 1.2;
+figure;
+b = boxplot(scores1(good_tx_vec_n3 == 2),'positions',x,'colors',tx_colors(2,:),'widths',0.10);
+set(b,{'linew'},{2})
+hold on;
+b2 = boxplot(scores1(good_tx_vec_n3 == 3),'positions',x2,'colors',tx_colors(3,:),'widths',0.10);
+set(b2,{'linew'},{2})
+set(gca,'visible','off');
+print -painters -depsc 'Fig_S3B_boxplot.pdf'
+
+%pval
+[h,p] = ttest2(scores1(good_tx_vec_n3 == 2),scores1(good_tx_vec_n3 == 3))
+end
+
+if Fig_S3C
+%% load data
+load Fig_3A_data.mat
+load prepare_the_data/in_vivo_E/gene_names_correct;
+%% measure cell cycle genes
+[a,G1_S] = xlsread('G1_S_mmu.xlsx');
+[a,G2] = xlsread('G2_mmu.xlsx');
+
+genes_ind_g1s = ismember(gene_names_correct,G1_S);
+genes_ind_g2 = ismember(gene_names_correct,G2);
+c_scores = log2(sum(good_log_n3(genes_ind_g1s,:))./sum(good_log_n3(genes_ind_g2,:)));
+
+figure;
+subplot(2,2,1);
+scatter(score_n(:,1),score_n(:,2),10,c_scores,'filled');colorbar;
+print -painters -depsc 'Fig_S3C_cell_cycle.pdf'
+end
+
+if Fig_S3D
+%% load data
+load Fig_3A_data.mat
+load Fig_3D_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+%% boxplot between sum PC2 gene expression
+[h,p] = ttest2(sum(zmat(top_genes_ind,good_tx_vec_n3 == 2)),sum(zmat(top_genes_ind,good_tx_vec_n3 == 3)))
+
+figure;
+b = boxplot(sum(zmat(top_genes_ind,:)),good_tx_vec_n3,'colors',tx_colors(2:3,:),'widths',0.25,'Symbol','+');
+set(b,{'linew'},{2})
+xlim([-1 4]);
+
+print -painters -depsc 'Fig_S3D_PC2_genes.pdf'
+end
+
+if Fig_S3E
+%% load data   
+load Fig_3A_data.mat
+load prepare_the_data/in_vivo_E/tx_colors.mat
+load prepare_the_data/cmap_color_blind.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+%% Fig S3C: neutrophil DE genes
+[DE_genes_ng2,DE_genes_pvals_ng2,DE_genes_names_ng2] = DE_genes_pvals(good_tpm_n3,good_tx_vec2_n3,gene_names_correct,0.0001);
+
+% display top 20 from each
+ko_top = DE_genes_ng2(5:24,1); %exclude HB genes
+wt_top = DE_genes_ng2(1:20,2);
+top_list = vertcat(ko_top,wt_top);
+top_list_names = gene_names_correct(top_list);
+
+mat = good_tpm_n3(top_list,:);
+matz = zscore(mat,0,2);
+
+figure;
+subplot(10,1,1:9);
+imagesc(matz);caxis([-2 2]);
+colormap(gca,cmap_color_blind);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(top_list_names));set(gca,'yticklabel',top_list_names);
+subplot(10,1,10);
+imagesc(good_tx_vec2_n3);colormap(gca,tx_colors2);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+print -painters -depsc 'Fig_S3E_heatmap.pdf'
+end
+
+if Fig_S3F
+%% load data    
+load Fig_3E_data.mat;   
+load prepare_the_data/in_vivo_E/tx_colors.mat
+load Fig_3A_data.mat tx_colors2; 
+%% PCA plots with inferred scores based on 3E
+% TP4
+k4(:,1)
+w4(:,1)
+
+scores1_4 = vertcat(k4(:,1),w4(:,1))
+scores2_4 = vertcat(k4(:,2),w4(:,2))
+
+f = size(k4(:,1),1);
+k = size(w4(:,1),1);
+scores1_vec = vertcat(zeros(f,1),ones(k,1));
+
+scores1_vec2_tp4 = scores1_vec+2;
+
+% TP3
+k3(:,1)
+w3(:,1)
+
+scores1_3 = vertcat(k3(:,1),w3(:,1))
+scores2_3 = vertcat(k3(:,2),w3(:,2))
+
+f = size(k3(:,1),1);
+k = size(w3(:,1),1);
+scores1_vec = vertcat(zeros(f,1),ones(k,1));
+
+scores1_vec2_tp3 = scores1_vec+2;
+
+% TP2
+k2(:,1)
+w2(:,1)
+
+scores1_2 = vertcat(k2(:,1),w2(:,1))
+scores2_2 = vertcat(k2(:,2),w2(:,2))
+
+f = size(k2(:,1),1);
+k = size(w2(:,1),1);
+scores1_vec = vertcat(zeros(f,1),ones(k,1));
+
+scores1_vec2_tp2 = scores1_vec+2;
+
+% TP1
+k1(:,1)
+w1(:,1)
+
+scores1_1 = vertcat(k1(:,1),w1(:,1))
+scores2_1 = vertcat(k1(:,2),w1(:,2))
+
+f = size(k1(:,1),1);
+k = size(w1(:,1),1);
+scores1_vec = vertcat(zeros(f,1),ones(k,1));
+
+scores1_vec2_tp1 = scores1_vec+2;
+
+figure;
+subplot(2,2,1);
+scatter(scores1_1,scores2_1,10,scores1_vec2_tp1,'filled');
+colormap((tx_colors2));
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('12h');
+
+subplot(2,2,2);
+scatter(scores1_2,scores2_2,10,scores1_vec2_tp2,'filled');
+colormap((tx_colors2));
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('24h');
+
+subplot(2,2,3);
+scatter(scores1_3,scores2_3,10,scores1_vec2_tp3,'filled');
+colormap(flip(tx_colors2));
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('48h');
+
+subplot(2,2,4);
+scatter(scores1_4,scores2_4,10,scores1_vec2_tp4,'filled');
+colormap((tx_colors2));
+set(gca,'xtick',[]);set(gca,'ytick',[]);title('72h');
+
+print -painters -depsc 'Fig_S3F.pdf'
+end
+
+if Fig_S3G
+%% load data
+load prepare_the_data/in_vivo_E/TP4_nm.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+load prepare_the_data/in_vivo_E/tx_colors.mat   
+load Fig_3A_data.mat tx_colors2 tx_labels2
+%% Fig S3E: 72h PCA
+sham_nl4 = TP4_nl_tx_vec == 1;
+good_nl4 = ~sham_nl4;
+
+% remake everything else for working mats
+good_log_n4 = TP4_nl_log(:,good_nl4);
+good_tpm_n4 = TP4_nl_tpm(:,good_nl4);
+good_tx_vec_n4 = TP4_nl_tx_vec(good_nl4);
+good_tx_vec2_n4 = good_tx_vec_n4 - 1;
+
+[info_genes_n4,info_genes_names_n4] = info_genes(good_tpm_n4,2,2,gene_names_correct);%425
+
+[coeff,score,~,~,explained,~] = pca(good_log_n4(info_genes_n4,:)');
+
+r = randperm(length(good_tx_vec_n4));
+
+figure;
+subplot(2,2,1)
+scatter(score(r,1),score(r,2),10, good_tx_vec_n4(r),'filled');
+colormap(tx_colors2);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+print -painters -depsc 'Fig_S3G_pca.pdf'
+%% save Fig_S3G data for Fig_S3H
+coeff_n_72 = coeff;
+score_n_72 = score;
+save Fig_S3G_data.mat good_log_n4 good_tpm_n4 good_tx_vec_n4 good_tx_vec2_n4 info_genes_n4...
+    info_genes_names_n4 coeff_n_72 score_n_72;
+end
+
+if Fig_S3H
+%% load data
+load prepare_the_data/in_vivo_E/TP4_nm.mat
+load prepare_the_data/in_vivo_E/gene_names_correct
+load prepare_the_data/in_vivo_E/tx_colors.mat   
+load Fig_3A_data.mat tx_colors2 tx_labels2
+load prepare_the_data/cmap_color_blind.mat
+load pc_score_colors.mat
+load Fig_S3G_data.mat
+%% PC2 high genes here 
+thresh_coeff = sqrt(1/(sum(info_genes_n4)));
+pc = 2;
+%select high and low genes
+genes_hi_coeff = (coeff_n_72(:,pc)) > thresh_coeff;
+a = info_genes_names_n4(genes_hi_coeff)
+a_ind = logical(ismember(gene_names_correct,a));
+
+
+% display top genes - in order of sorted coeffs
+coeff_2 = coeff_n_72(:,2);
+[f,fk] = sort(coeff_2,'descend');
+coeff_2_names_sort = info_genes_names_n4(fk);
+
+top35 = coeff_2_names_sort(1:35);
+top35_ind = ismember(gene_names_correct,top35);
+
+[i,xi] = sort(score_n_72(:,2),'ascend')
+
+mat = good_tpm_n4(top35_ind,:);
+mat_z = zscore(mat,0,2);
+scores1 = score_n_72(:,2);
+
+figure;
+subplot(10,1,1:8);
+imagesc(mat_z(:,xi));caxis([-2 2]);
+set(gca,'xtick',[]);
+set(gca,'ytick',1:length(top35));set(gca,'yticklabel',top35);
+colormap(gca,cmap_color_blind);
+subplot(10,1,9);
+imagesc(good_tx_vec2_n4(xi));
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(gca,tx_colors2);
+title('infection');
+subplot(10,1,10);
+imagesc(scores1(xi)');
+set(gca,'xtick',[]);set(gca,'ytick',[]);colormap(gca,pc_score_colors);
+title('pc 2 score');
+print -painters -depsc 'Fig_EV3H_heatmap.pdf'
+%% coefficient and pval vec
+[grad,im]=colorGradient([47,58,111],[240, 240, 240],128)
+
+figure;
+subplot(1,10,8);
+imagesc(coeff_2(fk(1:35)));
+colormap(grad);
+print -painters -depsc 'Fig_EV3H_coeff_vec.pdf'
+
+% redo heatmap
+zmat2 = zscore(good_tpm_n4,0,2);
+vec = NaN(sum(top35_ind),1);
+for v = 1:sum(top35_ind)
+    gene = (strmatch(top35(v),gene_names_correct,'exact'))
+    [~,p] = ttest2(zmat2(gene,good_tx_vec2_n4 == 1),zmat2(gene, good_tx_vec2_n4 == 2));
+    vec(v) = p;        
+end
+
+c1 = [236, 112, 99];
+    c2 = [240 240 240];
+    depth = 128;
+    [grad,im]=colorGradient(c1,c2,depth);
+
+figure;
+subplot(1,10,8:10);
+imagesc(-log(vec));colorbar;
+caxis([0 50]);colormap(grad);colorbar;
+
+print -painters -depsc 'Fig_S3H_sig_vec.pdf'
+end
+
