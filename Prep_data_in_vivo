@@ -1,0 +1,1150 @@
+load_data_culture_pos = 0;
+combine_data          = 0;
+tp1_immune            = 0;
+tp2_immune            = 0;
+tp3_immune            = 0;
+tp4_immune            = 0;
+
+if load_data_culture_pos
+%% load general data
+%load gene_names_indrop.mat;
+features = readtable('features');
+%% TP1 load data
+M1_exp = csvread('filtered_feature_bc_matrix_M1.csv',1,1);
+M5_exp = csvread('filtered_feature_bc_matrix_M5.csv',1,1);
+M9_exp = csvread('filtered_feature_bc_matrix_M9.csv',1,1);
+%M10 is semi pos
+M10_exp = csvread('filtered_feature_bc_matrix_M10.csv',1,1);
+% just to look at y chr
+% read in features:
+features = readtable('features_long_list');
+features2 = features{:,1}
+Y_chr_ind = ismember(features2,Y_chr_genes) % now there are way more genes that didnt get filtered out
+Y_chr_ind2 = ismember(features2,Y_chr_genes_in_use)
+
+
+TP1_exp = [M1_exp,M5_exp,M9_exp,M10_exp];
+TP1_vec_pre_filt = repelem(1:4,[size(M1_exp,2),size(M5_exp,2),size(M9_exp,2),size(M10_exp,2)]);
+%% TP1 QC filt
+indrop_genes = gene_names_indrop;
+indrop_vec = ismember(features{:,2},indrop_genes);
+%there are double names in features(:,2) in most of them only one is expressed:
+n=(features{:,2});
+[ii, jj, kk] = unique(n);
+
+% accumarray will tell you how many of each element there are
+double_names = ii(accumarray(kk, 1) > 1);
+
+%this will give you indices in the size of all genes
+lia= ismember(n,double_names);
+
+% this is from GA script: rm the one with lower exp
+sc_no_dup = NaN(size(n));
+
+%for every gene
+for g = 1:length(n)
+    %if its not a double name give it a 1 in the vector of genes to keep
+    if lia(g) < 1
+        sc_no_dup(g,1) = 1;
+    else
+        %otherwise find the indicies within the gene list where you expect
+        %this
+        ind_tmp = strmatch(n(g),n,'exact');
+        %find the sum of each of these values
+        ind_sum = sum(TP1_exp(ind_tmp,:),2);
+        %decide that first val is greater than second val
+        cond = ind_sum(1)>ind_sum(2);
+        if cond >0 %means that the first has higher exp
+            sc_no_dup(ind_tmp(1),1) = 1;
+            sc_no_dup(ind_tmp(2),1) = 0;
+        else
+            sc_no_dup(ind_tmp(1),1) = 0;
+            sc_no_dup(ind_tmp(2),1) = 1;
+       end
+    end
+end
+find(isnan(sc_no_dup))
+
+%31032 has three matches so i'm setting it to zero manually outside the loop
+sc_no_dup(31032) = 0;
+
+
+%now filter based on sc_no_dup which is a vec without the duplicates
+indrop_no_dup = indrop_vec&sc_no_dup;
+
+TP1_mat_filt_new = TP1_exp(indrop_no_dup,:);
+gene_names = n(indrop_no_dup);
+%% TP1 filter cells and info genes
+[TP1_raw_c,TP1_tpm_c,TP1_cells_to_keep] = filter_cells(TP1_mat_filt_new,600,0.2,0.15,gene_names);
+TP1_mat_vec_filt = TP1_vec_pre_filt(TP1_cells_to_keep);
+
+% TP1 info genes
+[info_genes_TP1,info_genes_names_TP1] = info_genes(TP1_tpm_c,1.5,1.5,gene_names);%329
+sum(info_genes_TP1)
+
+TP1_vec_post_filt = TP1_vec_pre_filt(TP1_cells_to_keep);
+%% TP2 load data
+M2_exp = csvread('filtered_feature_bc_matrix_M2.csv',1,1);
+% semi pos
+M6_exp = csvread('filtered_feature_bc_matrix_M6.csv',1,1);
+M12_exp = csvread('filtered_feature_bc_matrix_M12.csv',1,1);
+M13_exp = csvread('filtered_feature_bc_matrix_M13.csv',1,1);
+
+TP2_exp = [M2_exp,M6_exp,M12_exp,M13_exp];
+TP2_vec_pre_filt = repelem(1:4,[size(M2_exp,2),size(M6_exp,2),size(M12_exp,2),size(M13_exp,2)]);
+%% TP2 QC filt
+indrop_genes = gene_names_indrop;
+indrop_vec = ismember(features{:,2},indrop_genes);
+%there are double names in features(:,2) in most of them only one is expressed:
+n=(features{:,2});
+[ii, jj, kk] = unique(n);
+
+% accumarray will tell you how many of each element there are
+double_names = ii(accumarray(kk, 1) > 1);
+
+%this will give you indices in the size of all genes
+lia= ismember(n,double_names);
+
+% this is from GA script: rm the one with lower exp
+sc_no_dup = NaN(size(n));
+
+%for every gene
+for g = 1:length(n)
+    %if its not a double name give it a 1 in the vector of genes to keep
+    if lia(g) < 1
+        sc_no_dup(g,1) = 1;
+    else
+        %otherwise find the indicies within the gene list where you expect
+        %this
+        ind_tmp = strmatch(n(g),n,'exact');
+        %find the sum of each of these values
+        ind_sum = sum(TP2_exp(ind_tmp,:),2);
+        %decide that first val is greater than second val
+        cond = ind_sum(1)>ind_sum(2);
+        if cond >0 %means that the first has higher exp
+            sc_no_dup(ind_tmp(1),1) = 1;
+            sc_no_dup(ind_tmp(2),1) = 0;
+        else
+            sc_no_dup(ind_tmp(1),1) = 0;
+            sc_no_dup(ind_tmp(2),1) = 1;
+       end
+    end
+end
+find(isnan(sc_no_dup))
+
+%31032 has three matches so i'm setting it to zero manually outside the loop
+sc_no_dup(31032) = 0;
+
+
+%now filter based on sc_no_dup which is a vec without the duplicates
+indrop_no_dup = indrop_vec&sc_no_dup;
+
+TP2_mat_filt_new = TP2_exp(indrop_no_dup,:);
+gene_names = n(indrop_no_dup);
+%% TP2 filter cells and info genes
+[TP2_raw_c,TP2_tpm_c,TP2_cells_to_keep] = filter_cells(TP2_mat_filt_new,600,0.2,0.15,gene_names);
+TP2_mat_vec_filt = TP2_vec_pre_filt(TP2_cells_to_keep);
+
+% TP2 info genes
+[info_genes_TP2,info_genes_names_TP2] = info_genes(TP2_tpm_c,2,2,gene_names);%419
+sum(info_genes_TP2)
+%% TP3 load data
+M4_exp = csvread('filtered_feature_bc_matrix_M4.csv',1,1);
+M7_exp = csvread('filtered_feature_bc_matrix_M7.csv',1,1);
+M17_exp = csvread('filtered_feature_bc_matrix_M17.csv',1,1);
+M18_exp = csvread('filtered_feature_bc_matrix_M18.csv',1,1);
+
+TP3_exp = [M4_exp,M7_exp,M17_exp,M18_exp];
+TP3_vec_pre_filt = repelem(1:4,[size(M4_exp,2),size(M7_exp,2),size(M17_exp,2),size(M18_exp,2)]);
+%% TP3 QC filt
+indrop_genes = gene_names_indrop;
+indrop_vec = ismember(features{:,2},indrop_genes);
+%there are double names in features(:,2) in most of them only one is expressed:
+n=(features{:,2});
+[ii, jj, kk] = unique(n);
+
+% accumarray will tell you how many of each element there are
+double_names = ii(accumarray(kk, 1) > 1);
+
+%this will give you indices in the size of all genes
+lia= ismember(n,double_names);
+
+% this is from GA script: rm the one with lower exp
+sc_no_dup = NaN(size(n));
+
+%for every gene
+for g = 1:length(n)
+    %if its not a double name give it a 1 in the vector of genes to keep
+    if lia(g) < 1
+        sc_no_dup(g,1) = 1;
+    else
+        %otherwise find the indicies within the gene list where you expect
+        %this
+        ind_tmp = strmatch(n(g),n,'exact');
+        %find the sum of each of these values
+        ind_sum = sum(TP3_exp(ind_tmp,:),2);
+        %decide that first val is greater than second val
+        cond = ind_sum(1)>ind_sum(2);
+        if cond >0 %means that the first has higher exp
+            sc_no_dup(ind_tmp(1),1) = 1;
+            sc_no_dup(ind_tmp(2),1) = 0;
+        else
+            sc_no_dup(ind_tmp(1),1) = 0;
+            sc_no_dup(ind_tmp(2),1) = 1;
+       end
+    end
+end
+find(isnan(sc_no_dup))
+
+%31032 has three matches so i'm setting it to zero manually outside the loop
+sc_no_dup(31032) = 0;
+
+
+%now filter based on sc_no_dup which is a vec without the duplicates
+indrop_no_dup = indrop_vec&sc_no_dup;
+
+TP3_mat_filt_new = TP3_exp(indrop_no_dup,:);
+gene_names = n(indrop_no_dup);
+%% TP3 filter cells and info genes
+[TP3_raw_c,TP3_tpm_c,TP3_cells_to_keep] = filter_cells(TP3_mat_filt_new,600,0.2,0.15,gene_names);
+TP3_mat_vec_filt = TP3_vec_pre_filt(TP3_cells_to_keep);
+
+% TP3 info genes
+[info_genes_TP3,info_genes_names_TP3] = info_genes(TP3_tpm_c,2,2,gene_names);%585
+sum(info_genes_TP3)
+%% TP4 load data
+M3_exp = csvread('filtered_feature_bc_matrix_M3.csv',1,1);
+M8_exp = csvread('filtered_feature_bc_matrix_M8.csv',1,1);
+M20_exp = csvread('filtered_feature_bc_matrix_M20.csv',1,1);
+
+TP4_exp = [M3_exp,M8_exp,M20_exp];
+TP4_vec_pre_filt = repelem(1:3,[size(M3_exp,2),size(M8_exp,2),size(M20_exp,2)]);
+%% TP4 QC filt
+indrop_genes = gene_names_indrop;
+indrop_vec = ismember(features{:,2},indrop_genes);
+%there are double names in features(:,2) in most of them only one is expressed:
+n=(features{:,2});
+[ii, jj, kk] = unique(n);
+
+% accumarray will tell you how many of each element there are
+double_names = ii(accumarray(kk, 1) > 1);
+
+%this will give you indices in the size of all genes
+lia= ismember(n,double_names);
+
+% this is from GA script: rm the one with lower exp
+sc_no_dup = NaN(size(n));
+
+%for every gene
+for g = 1:length(n)
+    %if its not a double name give it a 1 in the vector of genes to keep
+    if lia(g) < 1
+        sc_no_dup(g,1) = 1;
+    else
+        %otherwise find the indicies within the gene list where you expect
+        %this
+        ind_tmp = strmatch(n(g),n,'exact');
+        %find the sum of each of these values
+        ind_sum = sum(TP4_exp(ind_tmp,:),2);
+        %decide that first val is greater than second val
+        cond = ind_sum(1)>ind_sum(2);
+        if cond >0 %means that the first has higher exp
+            sc_no_dup(ind_tmp(1),1) = 1;
+            sc_no_dup(ind_tmp(2),1) = 0;
+        else
+            sc_no_dup(ind_tmp(1),1) = 0;
+            sc_no_dup(ind_tmp(2),1) = 1;
+       end
+    end
+end
+find(isnan(sc_no_dup))
+
+%31032 has three matches so i'm setting it to zero manually outside the loop
+sc_no_dup(31032) = 0;
+
+
+%now filter based on sc_no_dup which is a vec without the duplicates
+indrop_no_dup = indrop_vec&sc_no_dup;
+
+TP4_mat_filt_new = TP4_exp(indrop_no_dup,:);
+gene_names = n(indrop_no_dup);
+%% TP4 filter cells and info genes
+[TP4_raw_c,TP4_tpm_c,TP4_cells_to_keep] = filter_cells(TP4_mat_filt_new,600,0.2,0.15,gene_names);
+TP4_mat_vec_filt = TP4_vec_pre_filt(TP4_cells_to_keep);
+
+% TP4 info genes
+[info_genes_TP4,info_genes_names_TP4] = info_genes(TP4_tpm_c,2,2,gene_names);%575
+sum(info_genes_TP4)
+%% combine info genes
+info_genes_mat = [info_genes_TP1,info_genes_TP2,info_genes_TP3,info_genes_TP4];
+info_genes_all = (sum(info_genes_mat')>0)';%757
+ %% save filt data and info genes
+save ('TP1c_data.mat','TP1_raw_c','TP1_tpm_c','TP1_cells_to_keep','info_genes_all','TP1_mat_vec_filt','gene_names','-v7.3');
+save ('TP2c_data.mat','TP2_raw_c','TP2_tpm_c','TP2_cells_to_keep','info_genes_all','TP2_mat_vec_filt','gene_names','-v7.3');
+save TP3c_data.mat TP3_raw_c TP3_tpm_c TP3_cells_to_keep info_genes_all TP3_mat_vec_filt gene_names;
+save TP4c_data.mat TP4_raw_c TP4_tpm_c TP4_cells_to_keep info_genes_all TP4_mat_vec_filt gene_names;   
+end
+
+if combine_data
+%% load data
+load TP1c_data.mat;
+load TP2c_data.mat;
+load TP3c_data.mat;
+load TP4c_data.mat;
+%% save raw mat  
+raw_mat_d = [TP1_raw_c,TP2_raw_c,TP3_raw_c,TP4_raw_c];
+save ('raw_mat_d.mat', 'raw_mat_d','-v7.3');
+%% make vecs and display
+tp1 = TP1_mat_vec_filt;
+tp2 = TP2_mat_vec_filt + 4;
+tp3 = TP3_mat_vec_filt + 8;
+tp4 = TP4_mat_vec_filt + 12;
+mat_vec_all = [tp1,tp2,tp3,tp4];
+
+a = brewermap(9,'Set2');
+b = brewermap(6,'Dark2');
+% c = brewermap(1,'Set3');
+colors15 = vertcat(a,b);
+mat_label = {'TP1S','TP1KO','TP1G','TP1Gb','TP2S','TP2KO','TP2G','TP2Gb','TP3S','TP3KO','TP3G','TP3Gb','TP4S','TP4KO','TP4G'};
+
+tp_vec = repelem(1:4,[size(tp1,2),size(tp2,2),size(tp3,2),size(tp4,2)]);
+
+tx_vec = NaN(size(mat_vec_all));
+tx_vec(mat_vec_all  == 1) = 1;
+tx_vec(mat_vec_all  == 5) = 1;
+tx_vec(mat_vec_all  == 9) = 1;
+tx_vec(mat_vec_all  == 13) = 1;
+
+tx_vec(mat_vec_all  == 2) = 2;
+tx_vec(mat_vec_all  == 6) = 2;
+tx_vec(mat_vec_all  == 10) = 2;
+tx_vec(mat_vec_all  == 14) = 2;
+
+tx_vec(mat_vec_all  == 3) = 3;
+tx_vec(mat_vec_all  == 4) = 3;
+tx_vec(mat_vec_all  == 7) = 3;
+tx_vec(mat_vec_all  == 8) = 3;
+tx_vec(mat_vec_all  == 11) = 3;
+tx_vec(mat_vec_all  == 12) = 3;
+tx_vec(mat_vec_all  == 15) = 3;
+
+figure;gscatter(mapped_all(:,1),mapped_all(:,2),mat_vec_all,colors15,'.',10);
+legend(mat_label);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+figure;gscatter(mapped_all(:,1),mapped_all(:,2),tp_vec,colors15,'.',10);
+legend('1','2','3','4');
+
+ih = [TP1_tpm_c,TP2_tpm_c,TP3_tpm_c,TP4_tpm_c];
+tpm_all =  ih;
+ih_log = log10(1+ih);
+log_all = ih_log;
+
+gene_names_correct = gene_names;
+save gene_names_correct.mat gene_names_correct;
+%% save here
+save ('sc_data_d.mat','tpm_all','info_genes_all','gene_names','mat_vec_all','mat_label','tx_vec',...
+    'tp_vec','log_all','-v7.3');
+end
+
+if tp1_immune
+%% load data
+load sc_data_d.mat;
+load raw_mat_d.mat;
+load gene_names_correct;
+load Y_chr_genes.mat;
+load cmap_color_blind;
+load GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X;
+%% for filtering later
+load TP1c_data.mat;
+load TP2c_data.mat;
+load TP3c_data.mat;
+load TP4c_data.mat;
+%% isolate TP1
+TP1 = tp_vec == 1;
+
+TP1_raw = raw_mat_d(:,TP1);
+TP1_tpm = tpm_all(:,TP1);
+TP1_log = log_all(:,TP1);
+
+TP1_mat_vec = mat_vec_all(TP1);
+TP1_tx_vec = tx_vec(TP1);
+%% TP1 info genes PCA
+[info_genes_1,info_genes_names_1] = info_genes(TP1_tpm,2,2,gene_names_correct);%205
+
+[coeff,score,~,~,explained,~] = pca(TP1_log(info_genes_1,:)');
+
+r = randperm(length(TP1_mat_vec));
+
+figure;
+subplot(2,2,1)
+scatter(score(r,1),score(r,2),20,'k','filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+subplot(2,2,2)
+gscatter(score(r,1),score(r,2),TP1_tx_vec(r),tx_colors,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend('Sham','KO','WT');
+
+% look at Hba-a1
+gene = strmatch('Hba-a1',gene_names_correct,'exact')
+
+figure;scatter(score(:,1),score(:,2),10,TP1_log(gene,:),'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);colorbar;title(gene_names_correct(gene));
+
+Y_chr_ind = ismember(gene_names_correct,Y_chr_genes);
+
+figure;scatter(score(:,1),score(:,2),10,sum(TP1_log(Y_chr_ind,:)),'filled');
+
+% TP1_clust = cluster((linkage(pdist(TP1_log(info_genes_1,:)'),'ward')),3);
+% TP1_clust4 = cluster((linkage(pdist(TP1_log(info_genes_1,:)'),'ward')),4);
+% save tp1_clust.mat TP1_clust;
+%load tp1_clust.mat;
+
+figure;gscatter(score(r,1),score(r,2),TP1_clust(r),s4,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+gene = strmatch('Ceacam11',gene_names,'exact')
+figure;scatter(score(:,1),score(:,2),10,TP1_log(gene,:),'filled');
+%% TP1 isolate trophoblasts
+trophoblasts = TP1_clust == 3;
+
+TP1_t_tpm = TP1_tpm(:,trophoblasts);
+TP1_t_log = TP1_log(:,trophoblasts);
+TP1_t_tx_vec = TP1_tx_vec(trophoblasts);
+%% isolate erythrocytes
+erythrocytes = TP1_clust == 1;
+
+TP1_e_tpm = TP1_tpm(:,erythrocytes);
+TP1_e_log = TP1_log(:,erythrocytes);
+TP1_e_tx_vec = TP1_tx_vec(erythrocytes);
+%% isolate immune cells based on clustering into 3 
+i1 = TP1_clust == 2;
+
+i1_tpm = TP1_tpm(:,i1);
+i1_log = TP1_log(:,i1);
+i1_raw = TP1_raw(:,i1);
+i1_tx_vec = TP1_tx_vec(i1);
+i1_sample_vec = TP1_mat_vec_filt(i1); %rev
+
+[info_genes_i1,info_genes_names_i1] = info_genes(i1_tpm,2,2,gene_names_correct);%309
+
+[coeff,score,~,~,explained,~] = pca(i1_log(info_genes_i1,:)');
+
+r = randperm(length(i1_tx_vec));
+figure;gscatter(score(r,1),score(r,2),i1_tx_vec(r),tx_colors,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend('Sham','KO','WT');
+
+i1_clust = cluster((linkage(pdist(i1_log(info_genes_i1,:)'),'ward')),2);
+
+figure;scatter(score(:,1),score(:,2),10,i1_clust,'filled');
+
+[DE_genes_i1,DE_genes_names_i1] = DE_genes(i1_tpm,i1_clust,gene_names_correct,0.0001);
+%endodermal: Afp, Apoa1, Rbp4, Fgg
+gene = strmatch('Afp',gene_names_correct,'exact')
+figure;scatter(score(:,1),score(:,2),10,i1_log(gene,:),'filled');
+
+% 2 is innate immune, 1 is endodermal
+ig = i1_clust == 2;
+figure;scatter(score(:,1),score(:,2),10,ig,'filled');
+
+ig_tpm = i1_tpm(:,ig);
+ig_log = i1_log(:,ig);
+ig_raw = i1_raw(:,ig);
+ig_tx_vec = i1_tx_vec(ig);
+ig_sample_vec = i1_sample_vec(ig);
+
+[info_genes_ig,info_genes_names_ig] = info_genes(ig_tpm,2,2,gene_names_correct);%599
+
+[coeff,score,~,~,explained,~] = pca(ig_log(info_genes_ig,:)');
+figure;scatter(score(:,1),score(:,2),20,ig_tx_vec,'filled');
+colormap(tx_colors);
+
+%Tyrobp
+gene = strmatch('Prl8a2',gene_names_correct,'exact')
+figure;scatter(score(:,1),score(:,2),20,ig_log(gene,:),'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);title(gene_names_correct(gene));
+
+ig_clust = cluster((linkage(pdist(ig_log(info_genes_ig,:)'),'ward')),3);
+
+figure;gscatter(score(:,1),score(:,2),ig_clust,s4,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+[DE_genes_ig,DE_genes_names_ig] = DE_genes(ig_tpm,ig_clust,gene_names_correct,0.0001);
+%1:monocyte 
+%2:granulocyte
+monocyte_genes = {'Prl8a2','Ctsk','Ly6c1'};
+neutrophil_genes = {'Tyrobp','Neat1','Fcer1g'};
+
+%pc1 low: Prl3b1 (invasive spongiotrophboblast), also trophoblast
+%progenitor, so exclude this
+
+ic = ig_clust == 1|ig_clust == 2; 
+
+ic_tpm = ig_tpm(:,ic);
+ic_log = ig_log(:,ic);
+ic_raw = ig_raw(:,ic);
+ic_tx_vec = ig_tx_vec(ic);
+ic_sample_vec = ig_sample_vec(ic);
+
+[info_genes_ic,info_genes_names_ic] = info_genes(ic_tpm,2,2,gene_names_correct);%566
+
+[coeff,score,~,~,explained,~] = pca(ic_log(info_genes_ic,:)');
+
+figure;
+gscatter(score(:,1),score(:,2),ic_tx_vec,tx_colors,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+genes = {'Ccr2','Apoe','Cd274','Neat1'};
+figure;
+for f = 1:length(genes)
+   subplot(2,2,f);
+   gene = strmatch(genes(f),gene_names_correct,'exact');
+   scatter(score(:,1),score(:,2),10,ic_log(gene,:),'filled');
+   set(gca,'xtick',[]);set(gca,'ytick',[]);title(genes(f));
+end
+
+decidual_stromal_genes = {'Prl8a2','Cryab','Ctsk'};
+figure
+for f = 1:length(decidual_stromal_genes)
+    subplot(2,3,f);
+    gene = strmatch(decidual_stromal_genes(f),gene_names_correct,'exact')
+    scatter(score(:,1),score(:,2),20,ic_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    title(decidual_stromal_genes(f));
+end
+
+ic_clust = cluster((linkage(pdist(ic_log(info_genes_ic,:)'),'ward')),2);
+
+figure;gscatter(score(:,1),score(:,2),ic_clust,s4,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+i1g = ic_clust == 2;
+figure;scatter(score(:,1),score(:,2),10,i1g,'filled');
+
+% isolate myeloid cells again
+i1g_tpm = ic_tpm(:,i1g);
+i1g_log = ic_log(:,i1g);
+i1g_raw = ic_raw(:,i1g);
+i1g_tx_vec = ic_tx_vec(i1g);
+i1g_sample_vec = ic_sample_vec(i1g);
+% visualize 
+[info_genes_i1g,info_genes_names_i1g] = info_genes(i1g_tpm,2,2,gene_names_correct);%595
+
+[coeff,score,~,~,explained,~] = pca(i1g_log(info_genes_i1g,:)');
+
+figure;gscatter(score(:,1),score(:,2),i1g_tx_vec,tx_colors,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend(tx_labels);
+
+genes = {'Apoe','Ccr2','Cd274'};
+
+figure;
+for f = 1:length(genes)
+    gene = strmatch(genes(f),gene_names_correct,'exact');
+    subplot(2,3,f);
+    scatter(score(:,1),score(:,2),20,i1g_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    title(genes(f));
+end
+
+gene = strmatch('Ly6g',gene_names_correct,'exact')
+figure;scatter(score(:,1),score(:,2),30,i1g_log(gene,:),'filled');
+
+neutrophil_genes = {'Tyrobp', 'Slpi', 'Neat1', 'Ly6g', 'S100a8', 'S100a9'};
+
+figure;
+for f = 1:length(neutrophil_genes)
+    subplot(2,3,f);
+    gene = strmatch(neutrophil_genes(f),gene_names_correct,'exact');
+    scatter(score(:,1),score(:,2),20,i1g_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);title(neutrophil_genes(f));
+end
+
+% Relevant genes: Spp1, Il1r2, Cxcr2, Nlrp3
+
+% cluster to isolate neutrophils
+i1g_clust = cluster((linkage(pdist(i1g_log(info_genes_i1g,:)'),'ward')),2);
+
+figure;gscatter(score(:,1),score(:,2),i1g_clust,s4,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+% separate neutrophils
+
+n1 = i1g_clust == 1;
+n1_tpm = i1g_tpm(:,n1);
+n1_log = i1g_log(:,n1);
+n1_tx_vec = i1g_tx_vec(n1);
+nl_sample_vec = i1g_sample_vec(n1);
+
+% prepare for saving
+TP1_nl_tpm = n1_tpm;
+TP1_nl_log = n1_log;
+TP1_nl_tx_vec = n1_tx_vec;
+TP1_nl_sample_vec = nl_sample_vec;
+% mat and vec are n2_log n2_tx_vec
+%% show myeloid populations
+m1 = i1g_clust == 2;
+m1_tpm = i1g_tpm(:,m1);
+m1_log = i1g_log(:,m1);
+m1_raw = i1g_raw(:,m1);
+m1_tx_vec = i1g_tx_vec(m1);
+m1_sample_vec = i1g_tx_vec(m1);
+
+% info genes PCA for these macs
+[info_genes_m1,info_genes_names_m1] = info_genes(m1_tpm,2,2,gene_names_correct);%666
+
+[coeff,score,~,~,explained,~] = pca(m1_log(info_genes_m1,:)');
+
+figure;gscatter(score(:,1),score(:,2),m1_tx_vec,tx_colors,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend(tx_labels);
+
+macs_genes = {'Apoe','Ccr2','Cd274'};
+figure;
+for f = 1:length(macs_genes)
+    gene = strmatch(macs_genes(f),gene_names_correct,'exact');
+    subplot(2,3,f);
+    scatter(score(:,1),score(:,2),20,m1_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);title(macs_genes(f));
+end
+
+m1_clust = cluster((linkage(pdist(m1_log(info_genes_m1,:)'),'ward')),4);
+
+figure;gscatter(score(:,1),score(:,2),m1_clust,s4,'.',20);
+% look at PC2 low
+% look at PC2 high genes
+thresh_coeff = sqrt(1/(size(info_genes_m1,1)));
+pc = 2;
+%select high and low genes
+genes_hi_coeff = (coeff(:,pc)) > thresh_coeff;
+genes_low_coeff = (coeff(:,pc))<(-thresh_coeff);
+pc2_low_names = info_genes_names_m1(genes_low_coeff)
+
+
+[DE_genes_m1,DE_genes_names_m1] = DE_genes(m1_tpm,m1_tx_vec,gene_names_correct,0.0001);
+
+
+% Apoa2, Afp, Apoa1
+gene = strmatch('Ttr',gene_names_correct,'exact')
+figure;scatter(score(:,1),score(:,2),20,m1_log(gene,:),'filled');
+
+%endodermal is clust 1
+m1g = m1_clust == 2|m1_clust == 3|m1_clust == 4;
+
+figure;scatter(score(:,1),score(:,2),20,m1g,'filled');
+
+m1g_tpm = m1_tpm(:,m1g);
+m1g_log = m1_log(:,m1g);
+m1g_raw = m1_raw(:,m1g);
+m1g_tx_vec = m1_tx_vec(m1g);
+m1g_sample_vec = m1_sample_vec(m1g);
+% prepare for saving
+TP1_macs_tpm_b = m1g_tpm;
+TP1_macs_log_b = m1g_log;
+TP1_macs_raw_b = m1g_raw;
+TP1_macs_tx_vec_b = m1g_tx_vec;
+TP1_macs_sample_vec_b = m1g_sample_vec;
+[info_genes_m1g,info_genes_names_m1g] = info_genes(m1g_tpm,2,2,gene_names_correct);%679
+
+[coeff,score,~,~,explained,~] = pca(m1g_log(info_genes_m1g,:)');
+figure;
+gscatter(score(:,1),score(:,2),m1g_tx_vec,c3,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend(tx_labels);
+%% save nls and macs
+save TP1_nm.mat TP1_nl_tpm TP1_nl_log TP1_nl_tx_vec TP1_macs_tpm TP1_macs_log TP1_macs_tx_vec;
+save TP1_e.mat TP1_e_tpm TP1_e_log TP1_e_tx_vec;
+save ('TP1_t.mat', 'TP1_t_tpm', 'TP1_t_log', 'TP1_t_tx_vec', '-v7.3');
+save TP1_macs_raw.mat TP1_macs_raw TP1_macs_tx_vec;
+save TP1_macs_raw_b.mat TP1_macs_raw_b TP1_macs_tx_vec_b;
+end
+
+if tp2_immune
+%% load data
+load sc_data_d.mat;
+load raw_mat_d.mat;
+load gene_names_correct;
+load Y_chr_genes.mat;
+load cmap_color_blind;
+load GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X;
+%% isolate TP2
+TP2 = tp_vec == 2;
+
+TP2_raw = raw_mat_d(:,TP2);
+TP2_tpm = tpm_all(:,TP2);
+TP2_log = log_all(:,TP2);
+
+TP2_mat_vec = mat_vec_all(TP2);
+TP2_tx_vec = tx_vec(TP2);
+%% TP2 info genes PCA
+% colors here 
+colors5 = brewermap(6,'Set2');
+colors3 = colors5(3:5,:);
+
+[info_genes_2,info_genes_names_2] = info_genes(TP2_tpm,2,2,gene_names_correct);%419
+
+[coeff,score,~,~,explained,~] = pca(TP2_log(info_genes_2,:)');
+
+r = randperm(length(TP2_mat_vec));
+
+figure;
+subplot(2,2,1)
+scatter(score(r,1),score(r,2),20,'k','filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+subplot(2,2,2)
+gscatter(score(r,1),score(r,2),TP2_tx_vec(r),c3,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend('Sham','KO','WT');
+
+% look at Hba-a1
+gene = strmatch('Hba-a1',gene_names_correct,'exact')
+
+figure;scatter(score(:,1),score(:,2),10,TP2_log(gene,:),'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);colorbar;title(gene_names_correct(gene));
+
+Y_chr_ind = ismember(gene_names_correct,Y_chr_genes);
+
+figure;scatter(score(:,1),score(:,2),10,sum(TP2_log(Y_chr_ind,:)),'filled');
+
+TP2_clust = cluster((linkage(pdist(TP2_log(info_genes_2,:)'),'ward')),3);
+TP2_clust4 = cluster((linkage(pdist(TP2_log(info_genes_2,:)'),'ward')),4);
+
+figure;gscatter(score(r,1),score(r,2),TP2_clust4(r),s4,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+%% isolate trophoblasts
+trophoblasts = TP2_clust4 == 3;
+
+TP2_t_tpm = TP2_tpm(:,trophoblasts);
+TP2_t_log = TP2_log(:,trophoblasts);
+TP2_t_tx_vec = TP2_tx_vec(trophoblasts);
+%% isolate erythrocytes
+erythrocytes = TP2_clust4 == 4;
+
+TP2_e_tpm  = TP2_tpm(:,erythrocytes);
+TP2_e_log = TP2_log(:,erythrocytes);
+TP2_e_tx_vec = TP2_tx_vec(erythrocytes);
+%% isolate immune cells
+i2 = TP2_clust4 == 1|TP2_clust4 == 2;
+
+figure;scatter(score(:,1),score(:,2),20,i2,'filled');
+
+i2_tpm = TP2_tpm(:,i2);
+i2_log = TP2_log(:,i2);
+i2_raw = TP2_raw(:,i2);
+i2_tx_vec = TP2_tx_vec(i2);
+
+% info genes PCA
+[info_genes_i2,info_genes_names_i2] = info_genes(i2_tpm,2,2,gene_names_correct);%749
+
+[coeff,score,~,~,explained,~] = pca(i2_log(info_genes_i2,:)');
+
+figure;gscatter(score(:,1),score(:,2),i2_tx_vec,colors3,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+legend('Sham','KO','WT');
+
+i2_clust = cluster((linkage(pdist(i2_log(info_genes_i2,:)'),'ward')),4);
+
+figure;gscatter(score(:,1),score(:,2),i2_clust,brewermap(4,'Dark2'),'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+% DE genes between clusters (NOT between conditions bc for that you have to
+% subdivide)
+[DE_genes_i2,DE_genes_names_i2] = DE_genes(i2_tpm,i2_clust,gene_names_correct,0.0001);
+
+gene = strmatch('C1qc',gene_names,'exact')
+
+figure;
+subplot(2,2,1);
+scatter(score(:,1),score(:,2),20,i2_log(gene,:),'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);title(gene_names_correct(gene));
+
+% look at PC2 high genes
+% look at PC1 low
+% define PC1 high genes
+thresh_coeff = sqrt(1/(size(info_genes_i2,1)));
+pc = 2;
+
+%select high and low genes
+genes_hi_coeff = (coeff(:,pc)) > thresh_coeff;
+genes_low_coeff = (coeff(:,pc))<(-thresh_coeff);
+a = info_genes_names_i2(genes_hi_coeff)
+
+genes = ismember(gene_names_correct,a);
+p_thresh_go = 0.00000001;
+Pvals = Enrichment(genes,p_thresh_go, GO_mat_mouse_50_10X, GO_names_50_10X);
+[~,xi1] = sort(Pvals);
+p1 = xi1(1:20);
+    
+figure;
+barh(flip(-log10(Pvals(p1)')));
+set(gca,'ytick',1:length(p1));
+set(gca,'yticklabel',flip(GO_names_50_10X(p1)));
+
+ds_cells = {'Prl8a2','Cryab','Ctsk'};
+figure;
+for f = 1:length(ds_cells)
+    subplot(2,3,f);
+    gene = strmatch(ds_cells(f),gene_names_correct,'exact');
+    scatter(score(:,1),score(:,2),20,i2_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    title(ds_cells(f));
+end
+
+ep_endo = {'Epcam','Pecam1','Icam2','Cd34','Maged2','Cldn5'};
+figure;
+for f = 1:length(ep_endo)
+    subplot(2,3,f);
+    gene = strmatch(ep_endo(f),gene_names_correct,'exact');
+    scatter(score(:,1),score(:,2),20,i2_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    title(ep_endo(f));
+end
+
+neutrophils = {'Ly6g','S100a8','S100a9','Neat1','Cd14','Slpi'};
+figure;
+for f = 1:length(neutrophils)
+    subplot(2,3,f);
+    gene = strmatch(neutrophils(f),gene_names_correct,'exact');
+    scatter(score(:,1),score(:,2),20,i2_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    title(neutrophils(f));
+end
+
+macs = {'Apoe','Adgre1','Ccr2','Spp1','Ly6c2','C1qc'};
+figure;
+for f = 1:length(macs)
+    subplot(2,3,f);
+    gene = strmatch(macs(f),gene_names_correct,'exact');
+    scatter(score(:,1),score(:,2),20,i2_log(gene,:),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    title(macs(f));
+end
+%% analyze granulocytes
+n2 = i2_clust == 4;
+
+n2_tpm = i2_tpm(:,n2);
+n2_log = i2_log(:,n2);
+n2_tx_vec = i2_tx_vec(n2);
+
+% prepare for saving here: 
+TP2_nl_tpm = n2_tpm;
+TP2_nl_log = n2_log;
+TP2_nl_tx_vec = n2_tx_vec;
+%% isolate TP2 macs 
+m2 = i2_clust == 1;
+
+m2_tpm = i2_tpm(:,m2);
+m2_log = i2_log(:,m2);
+m2_raw = i2_raw(:,m2);
+
+m2_tx_vec = i2_tx_vec(m2);
+
+% prepare for saving
+TP2_macs_tpm = m2_tpm;
+TP2_macs_log = m2_log;
+TP2_macs_raw = m2_raw;
+TP2_macs_tx_vec = m2_tx_vec;
+%% save nm here
+save TP2_nm.mat TP2_nl_tpm TP2_nl_log TP2_nl_tx_vec TP2_tx_vec TP2_macs_tpm TP2_macs_log TP2_macs_tx_vec;
+save TP2_e.mat TP2_e_tpm TP2_e_log TP2_e_tx_vec;
+save TP2_t.mat TP2_t_tpm TP2_t_log TP2_t_tx_vec;
+save TP2_macs_raw.mat TP2_macs_raw;
+end
+
+if tp3_immune
+%% load data
+load sc_data_d.mat;
+load raw_mat_d.mat;
+load gene_names_correct;
+load Y_chr_genes.mat;
+load GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X;
+%% isolate TP3
+TP3 = tp_vec == 3;
+
+TP3_raw = raw_mat_d(:,TP3);
+TP3_tpm = tpm_all(:,TP3);
+TP3_log = log_all(:,TP3);
+
+TP3_mat_vec = mat_vec_all(TP3);
+TP3_tx_vec = tx_vec(TP3);
+%% define tx colors
+a = brewermap(5,'Set3');
+ca = a(5,:);
+b = brewermap(5,'Set2');
+cb = b(5,:);
+c = brewermap(1,'Dark2');
+spectral4 = brewermap(10,'Spectral');
+s4 = spectral4(1:4,:);
+
+
+tx_colors = vertcat(ca,cb,c);
+save tx_colors.mat tx_colors s4;
+load tx_colors.mat;
+%% TP3 info genes PCA all lineages
+% info genes pca
+[info_genes_3,info_genes_names_3] = info_genes(TP3_tpm,2,2,gene_names_correct);%585
+
+[coeff,score,~,~,explained,~] = pca(TP3_log(info_genes_3,:)');
+
+r = randperm(length(TP3_mat_vec));
+
+% colors here 
+colors5 = brewermap(6,'Set2');
+colors3 = colors5(3:5,:);
+
+TP3_clust = cluster((linkage(pdist(TP3_log(info_genes_3,:)'),'ward')),4);
+TP3_clust3 = cluster((linkage(pdist(TP3_log(info_genes_3,:)'),'ward')),3);
+
+lin_labels = {'macrophage','trophoblast','granulocyte','erythrocyte'};
+
+figure;gscatter(score(:,1),score(:,2),TP3_clust,s4,'.',30);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend(lin_labels);
+
+erythrocytes = TP3_clust == 4;
+TP3_e_tpm = TP3_tpm(:,erythrocytes);
+TP3_e_log = TP3_log(:,erythrocytes);
+TP3_e_tx_vec = TP3_tx_vec(erythrocytes);
+
+trophoblasts = TP3_clust == 2;
+TP3_t_tpm = TP3_tpm(:,trophoblasts);
+TP3_t_log = TP3_log(:,trophoblasts);
+TP3_t_tx_vec = TP3_tx_vec(trophoblasts);
+%% isolate immune cells
+i = TP3_clust == 1|TP3_clust == 3;
+
+i_tpm = TP3_tpm(:,i);
+i_log = TP3_log(:,i);
+i_tx_vec = TP3_tx_vec(i);
+
+i_raw = TP3_raw(:,i);
+
+% info genes PCA
+[info_genes_i,info_genes_names_i] = info_genes(i_tpm,2,2,gene_names);%639
+
+[coeff,score,~,~,explained,~] = pca(i_log(info_genes_i,:)');
+
+figure;gscatter(score(:,1),score(:,2),i_tx_vec,colors3,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend('Sham','KO','WT');
+
+% tsne
+no_dims       = 2;
+initial_dims  = 10;
+min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_i = i_log(info_genes_i,:);
+
+% mappedY_i = tsne(Y_i',[], no_dims, initial_dims, perplexity);
+% 
+% save mappedY_i.mat mappedY_i;
+load mappedY_i.mat;
+
+figure;gscatter(mappedY_i(:,1),mappedY_i(:,2),i_tx_vec,colors3,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+legend('Sham','KO','WT');
+
+i_clust = cluster((linkage(pdist(i_log(info_genes_i,:)'),'ward')),2);
+%% isolate neutrophils all conditions
+in = i_clust == 2;
+
+in_tpm = i_tpm(:,in);
+in_log = i_log(:,in);
+in_tx_vec = i_tx_vec(in);
+in_raw = i_raw(:,in);
+
+% prep for saving
+TP3_nl_tpm = in_tpm;
+TP3_nl_log = in_log;
+TP3_nl_tx_vec = in_tx_vec;
+
+TP3_nl_raw = in_raw;
+
+[info_genes_in,info_genes_names_in] = info_genes(in_tpm,2,2,gene_names_correct);%462
+
+[coeff,score,~,~,explained,~] = pca(in_log(info_genes_in,:)');
+
+figure;gscatter(score(:,1),score(:,2),in_tx_vec,colors3,'.',20);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend('Sham','KO','WT');
+%% isolate macrophages all conditions
+im = i_clust == 1;
+
+im_tpm = i_tpm(:,im);
+im_log = i_log(:,im);
+im_tx_vec = i_tx_vec(im);
+
+im_raw = i_raw(:,im);
+
+[info_genes_im,info_genes_names_im] = info_genes(im_tpm,2,2,gene_names_correct);%610
+
+[coeff,score,~,~,explained,~] = pca(im_log(info_genes_im,:)');
+
+figure;gscatter(score(:,1),score(:,2),im_tx_vec,colors3,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend('Sham','KO','WT');
+
+% tsne
+% now do tsne on sham wt macs and see how many subpops come out:
+no_dims       = 2;
+initial_dims  = 10;
+min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_im = im_log(info_genes_im,:);
+
+mappedY_im = tsne(Y_im',[], no_dims, initial_dims, perplexity);
+
+save mappedY_im.mat mappedY_im;
+load mappedY_im.mat;
+figure;gscatter(mappedY_im(:,1),mappedY_im(:,2),im_tx_vec,colors3,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+legend('Sham','KO','WT');
+
+
+
+% clustering
+im_clust = cluster((linkage(pdist(im_log(info_genes_im,:)'),'ward')),4);
+
+c2_clust = cluster((linkage(pdist(c2_log(info_genes_c2,:)'),'ward')),4);
+
+figure;gscatter(score(:,1),score(:,2),c2_clust,s4,'.',20);
+[DE_genes_c2,DE_genes_names_c2] = DE_genes(c2_tpm,c2_clust,gene_names_correct,0.0001);
+
+
+% clust 1  = apoe 
+% cluster 2 = Maged2, Pecam1, Epcam :stromal
+% cluster 3 = Plac8,Ly6c2
+% cluster 4 = cd274, arg1
+%% remove stromal cells from macrophages
+stromal = im_clust == 2;
+macs = logical(~stromal);
+figure;scatter(mappedY_im(:,1),mappedY_im(:,2),10,macs,'filled');
+
+macs_tpm = im_tpm(:,macs);
+macs_log = im_log(:,macs);
+macs_tx_vec = im_tx_vec(macs);
+macs_raw = im_raw(:,macs);
+
+% prep macs for saving
+TP3_macs_tpm = macs_tpm;
+TP3_macs_log = macs_log;
+TP3_macs_tx_vec = macs_tx_vec;
+TP3_macs_raw = macs_raw;
+%% save neutrophils and macrophages
+save TP3_nl_raw.mat TP3_nl_raw;
+save TP3_nm.mat TP3_macs_tpm TP3_macs_log TP3_macs_tx_vec TP3_nl_tpm TP3_nl_log TP3_nl_tx_vec;
+save TP3_e.mat TP3_e_tpm TP3_e_log TP3_e_tx_vec;
+save TP3_t.mat TP3_t_tpm TP3_t_log TP3_t_tx_vec;
+save TP3_macs_raw.mat TP3_macs_raw;
+end
+
+if tp4_immune
+%% load data
+load sc_data_d.mat;
+load raw_mat_d.mat;
+load gene_names_correct;
+load Y_chr_genes.mat;
+load cmap_color_blind;
+load GO_mouse_mat_10X.mat GO_names_50_10X GO_mat_mouse_50_10X;
+%% isolate TP4
+TP4 = tp_vec == 4;
+
+TP4_raw = raw_mat_d(:,TP4);
+TP4_tpm = tpm_all(:,TP4);
+TP4_log = log_all(:,TP4);
+
+TP4_mat_vec = mat_vec_all(TP4);
+TP4_tx_vec = tx_vec(TP4);
+
+%rev
+%TP4_mat_vec_filt
+%% TP4 info genes PCA
+
+[info_genes_4,info_genes_names_4] = info_genes(TP4_tpm,2,2,gene_names_correct);%575
+
+[coeff,score,~,~,explained,~] = pca(TP4_log(info_genes_4,:)');
+
+TP4_clust = cluster((linkage(pdist(TP4_log(info_genes_4,:)'),'ward')),4);
+
+figure;gscatter(score(:,1),score(:,2),TP4_clust,brewermap(5,'Dark2'),'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+%% TP4 isolate trophoblasts
+trophoblasts = TP4_clust == 4;
+
+TP4_t_tpm = TP4_tpm(:,trophoblasts);
+TP4_t_log = TP4_log(:,trophoblasts);
+TP4_t_tx_vec = TP4_tx_vec(trophoblasts);
+%% TP4 isolate erythrocytes
+erythrocytes = TP4_clust == 3;
+
+TP4_e_tpm = TP4_tpm(:,erythrocytes);
+TP4_e_log = TP4_log(:,erythrocytes);
+TP4_e_tx_vec = TP4_tx_vec(erythrocytes);
+%% TP4 isolate immune cells
+% since not all neutrophils 
+i4 = TP4_clust == 1|TP4_clust == 2;
+
+i4_tpm = TP4_tpm(:,i4);
+i4_log = TP4_log(:,i4);
+i4_raw = TP4_raw(:,i4);
+i4_tx_vec = TP4_tx_vec(i4);
+
+% info genes PCA
+[info_genes_i4,info_genes_names_i4] = info_genes(i4_tpm,2,2,gene_names);%614
+
+[coeff,score,~,~,explained,~] = pca(i4_log(info_genes_i4,:)');
+
+figure;gscatter(score(:,1),score(:,2),i4_tx_vec,tx_colors,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);legend('Sham','KO','WT');
+
+% tsne
+no_dims       = 2;
+initial_dims  = 10;
+min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_i4 = i4_log(info_genes_i4,:);
+
+% mappedY_i4 = tsne(Y_i4',[], no_dims, initial_dims, perplexity);
+% 
+% save mappedY_i4.mat mappedY_i4;
+load mappedY_i4.mat;
+
+figure;gscatter(mappedY_i4(:,1),mappedY_i4(:,2),i4_tx_vec,tx_colors,'.',10);
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+legend('Sham','KO','WT');
+
+i_clust4 = cluster((linkage(pdist(i4_log(info_genes_i4,:)'),'ward')),2);
+%% TP4 neutrophil cluster 
+c2 = i_clust4 == 2;
+
+% create create neutrophil mats
+c2_tpm = i4_tpm(:,c2);
+c2_log = i4_log(:,c2);
+c2_tx_vec = i4_tx_vec(c2);
+
+% prepare for saving
+TP4_nl_tpm = c2_tpm;
+TP4_nl_log = c2_log;
+TP4_nl_tx_vec = c2_tx_vec;
+%% TP4 macrophages
+m4 = i_clust4 == 1;
+
+figure;scatter(mappedY_i4(:,1),mappedY_i4(:,2),10,m4,'filled');
+
+[DE_genes_m4,DE_genes_names_m4] = DE_genes(i4_tpm(:,m4),i4_tx_vec(m4),gene_names_correct,0.0001);
+
+% make mats
+m4_tpm = i4_tpm(:,m4);
+m4_log = i4_log(:,m4);
+m4_raw = i4_raw(:,m4);
+m4_tx_vec = i4_tx_vec(m4);
+
+% prepare for saving
+TP4_macs_tpm = m4_tpm;
+TP4_macs_log = m4_log;
+TP4_macs_raw = m4_raw;
+
+TP4_macs_tx_vec = m4_tx_vec;
+%% save data
+save TP4_nm.mat TP4_macs_tpm TP4_macs_log TP4_macs_tx_vec TP4_nl_tpm TP4_nl_log TP4_nl_tx_vec;
+save TP4_e.mat TP4_e_tpm TP4_e_log TP4_e_tx_vec;
+save TP4_t.mat TP4_t_tpm TP4_t_log TP4_t_tx_vec;
+save TP4_macs_raw.mat TP4_macs_raw;
+end
+
+
+
+
