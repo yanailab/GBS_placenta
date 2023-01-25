@@ -1,0 +1,550 @@
+F_r2_load         = 0;
+F_r2_norm_ds_filt = 1;
+
+F_r1_load         = 0;
+F_r1_norm_ds_filt = 0;
+
+E_load            = 0;
+E_norm_ds_filt    = 0;
+
+if F_r2_load % R2 = male fetus placenta A
+% read in raw data
+CBA2 = csvread('filtered_feature_bc_matrix_CBA2.csv', 1, 1);
+KBA4 = csvread('filtered_feature_bc_matrix_KBA4.csv', 1, 1);
+WBA6 = csvread('filtered_feature_bc_matrix_WBA6.csv', 1, 1);
+
+features = readtable('features');
+    
+F_r2 = [CBA2,KBA4,WBA6];    
+F_r2_vec_uf = repelem(1:3,[size(CBA2,2),size(KBA4,2),size(WBA6,2)]);
+
+% there are double names in features(:,2) in most of them    
+proteins = readtable('protein_coding_genes_GRCh38.p12.txt');
+
+proteins_vec = ismember(features{:,2}, proteins{:,1});
+n=(features{:,2});
+[ii, jj, kk] = unique(n);
+double_names = ii(accumarray(kk, 1) > 1);
+lia= ismember(n,double_names);
+
+
+sc_no_dup = NaN(size(n));
+for g = 1:length(n)
+    if lia(g) < 1
+        sc_no_dup(g,1) = 1;
+    else
+        ind_tmp = strmatch(n(g),n,'exact');
+        ind_sum = sum(F_r2(ind_tmp,:),2);
+        cond = ind_sum(1)>ind_sum(2);
+        if cond >0 %means that the first has higher exp
+            sc_no_dup(ind_tmp(1),1) = 1;
+            sc_no_dup(ind_tmp(2),1) = 0;
+        else
+            sc_no_dup(ind_tmp(1),1) = 0;
+            sc_no_dup(ind_tmp(2),1) = 1;
+        end
+    end
+end
+
+
+% sc_no_dup is a vec without the duplicates (zeros)
+protein_no_dup = proteins_vec&logical(sc_no_dup);
+gene_names = n(protein_no_dup);
+    
+    
+singlets_mat_F_r2 = F_r2(protein_no_dup,:);
+
+% filter cells
+min_umi    = 500;
+cond_1     = sum(singlets_mat_F_r2)>min_umi; sum(cond_1)
+ribo_genes = startsWith(gene_names,'RPL')|startsWith(gene_names,'RPS');
+mito_genes = startsWith(gene_names,'MT-')|startsWith(gene_names,'MTRNR');
+cond_2     = sum(singlets_mat_F_r2(ribo_genes,:))./sum(singlets_mat_F_r2) < 0.20;
+cond_3     = sum(singlets_mat_F_r2(mito_genes,:))./sum(singlets_mat_F_r2) < 0.15;
+good_cells_F_r2 = (cond_1 & cond_2 & cond_3); sum(good_cells_F_r2)
+ribo_mito  = ribo_genes|mito_genes;
+
+good_singlets_mat_F_r2 = singlets_mat_F_r2(:,good_cells_F_r2);
+F_r2_vec = F_r2_vec_uf(good_cells_F_r2);
+save F_r2_raw.mat good_singlets_mat_F_r2 F_r2_vec gene_names;   
+end
+
+if F_r2_norm_ds_filt
+%% load data
+load cmap_color_blind.mat;
+load F_r2_raw.mat;
+load tx_colors.mat; % make this somewhere new in this script
+load macs_subtypes.mat; % make this somewhere new in this script
+load mappedY_gg.mat; % figure out how to root these so its the same every time
+load hpm_F_gg.mat;
+%% downsample
+raw_ctrl = good_singlets_mat_F_r2(:,F_r2_vec == 1);
+ctrl_ds_r2 = downsample(raw_ctrl',2)';
+
+raw_ko = good_singlets_mat_F_r2(:,F_r2_vec == 2);
+ko_ds_r2 = downsample(raw_ko',2)';
+
+raw_wt = good_singlets_mat_F_r2(:,F_r2_vec == 3);
+
+raw_mat_ds_r2 = [ctrl_ds_r2,ko_ds_r2,raw_wt];
+mat_vec_ds_r2 = repelem(1:3,[size(ctrl_ds_r2,2),size(ko_ds_r2,2),size(raw_wt,2)]);
+%% normalize
+mat_tpm_ds_r2 = median(sum(raw_mat_ds_r2))*bsxfun(@rdivide,raw_mat_ds_r2,sum(raw_mat_ds_r2));
+mat_log_ds_r2 = log10(1+mat_tpm_ds_r2);
+
+mat_label = {'control','KO','WT'};
+%% filter stromal cells 
+% pca and tsne
+[info_genes_r2d,info_genes_names_r2d] = info_genes(mat_tpm_ds_r2,2,2,gene_names);%429
+
+[coeff,score,~,~,explained,~] = pca(mat_log_ds_r2(info_genes_r2d,:)');
+
+figure;
+scatter(score(:,1),score(:,2),30,'k','filled');
+% tsne
+% no_dims       = 2;
+% initial_dims  = 10;
+% min(find(cumsum(explained)>=90));
+% perplexity    = 50;
+% 
+% Y_r2d = mat_log_ds_r2(info_genes_r2d,:);
+% mappedY_r2d = tsne(Y_r2d',[], no_dims, initial_dims, perplexity);
+% save mappedY_r2d.mat mappedY_r2d;
+
+load mappedY_r2d.mat;
+
+macs_cluster_labels = {'HB','stromal','maternal'};
+
+axis_limit_low = [0 0 0];
+axis_limit_high = [60 20 80];
+figure;
+for f = 1:length(macs_cluster_labels)
+    subplot(2,3,f)
+    scatter(mappedY_r2d(:,1),mappedY_r2d(:,2),10,sum(mat_log_ds_r2(DE_genes_c(:,f),:)),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);title(macs_cluster_labels(f));
+    colormap(cmap_color_blind);
+    caxis([axis_limit_low(f),axis_limit_high(f)]);
+end
+
+print -painters -depsc 'Fig_S5a_subtypes.pdf' 
+
+
+
+clust2 = cluster((linkage(pdist(mat_log_ds_r2(info_genes_r2d,:)'),'ward')),2);
+
+ca = brewermap(8,'Set2');ac = ca(8,:);
+cb = ca(1,:);
+c2 = vertcat(cb,ca);
+
+figure;scatter(mappedY_r2d(:,1),mappedY_r2d(:,2),20,clust2,'filled');
+set(gca,'visible','off');colormap(c2);
+
+print -painters -depsc 'Fig_S5a_first_remove.pdf' 
+
+% keep good
+g = clust2 == 2;
+g_raw = raw_mat_ds_r2(:,g);
+g_tpm = mat_tpm_ds_r2(:,g);
+g_log = mat_log_ds_r2(:,g);
+
+g_vec = mat_vec_ds_r2(g);
+
+% filter again
+[info_genes_g,info_genes_names_g] = info_genes(g_tpm,2,2,gene_names);%383
+
+[coeff,score,~,~,explained,~] = pca(g_log(info_genes_g,:)');
+
+% no_dims       = 2;
+% initial_dims  = 10;
+% min(find(cumsum(explained)>=90));
+% perplexity    = 50;
+% 
+% Y_g = g_log(info_genes_g,:);
+% mappedY_g = tsne(Y_g',[], no_dims, initial_dims, perplexity);
+% save mappedY_g.mat mappedY_g;
+load mappedY_g.mat;
+
+axis_limit_low = [0 0 0];
+axis_limit_high = [60 20 80];
+
+figure;
+for f = 1:length(macs_cluster_labels)
+    subplot(2,3,f)
+    scatter(mappedY_g(:,1),mappedY_g(:,2),7,sum(g_log(DE_genes_c(:,f),:)),'filled');
+    title(macs_cluster_labels(f));
+    caxis([axis_limit_low(f),axis_limit_high(f)]);
+    set(gca,'xtick',[]);set(gca,'ytick',[]);
+    colormap(cmap_color_blind);
+end
+
+print -painters -depsc 'Fig_S5a_subtypes2.pdf' 
+
+clust = cluster((linkage(pdist(g_log(info_genes_g,:)'),'ward')),6);
+
+figure;
+scatter(mappedY_g(:,1),mappedY_g(:,2),20,clust,'filled');
+set(gca,'visible','off');colormap(flip(c));
+
+print -painters -depsc 'Fig_S5a_second_remove.pdf' 
+
+% remove stromal again
+rm = clust == 2;
+
+figure;
+scatter(mappedY_g(:,1),mappedY_g(:,2),30,rm,'filled');
+colormap(flip(c2));set(gca,'xtick',[]);set(gca,'ytick',[]);
+
+print -painters -depsc 'Fig_S5a_second_remove_two_colors.pdf' 
+
+
+gg = ~rm;
+
+gg_raw = g_raw(:,gg);
+gg_tpm = g_tpm(:,gg);
+gg_log = g_log(:,gg);
+gg_vec = g_vec(gg);
+
+[info_genes_gg,info_genes_names_gg] = info_genes(gg_tpm,2,2,gene_names);%324
+
+[coeff,score,~,~,explained,~] = pca(gg_log(info_genes_gg,:)');
+figure;scatter(score(:,1),score(:,2),30,'k','filled');
+score_gg = score;
+no_dims       = 2;
+initial_dims  = 10;
+min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_gg = gg_log(info_genes_gg,:);
+% mappedY_gg = tsne(Y_gg',[], no_dims, initial_dims, perplexity);
+% save mappedY_gg.mat mappedY_gg score_gg info_genes_gg;
+load mappedY_gg.mat;
+%% save data
+save hpm_F_r2_gg.mat mappedY_gg gene_names gg_raw gg_tpm gg_log gg_vec;
+end
+
+if F_r1_load % R1 = female fetus placenta B
+% read in raw data
+CAA1 = csvread('filtered_feature_bc_matrix_CAA1.csv', 1, 1);
+KAA3 = csvread('filtered_feature_bc_matrix_KAA3.csv', 1, 1);
+WAA5 = csvread('filtered_feature_bc_matrix_WAA5.csv', 1, 1);
+
+features = readtable('features');
+    
+F_r1 = [CAA1,KAA3,WAA5];    
+F_r1_vec_uf = repelem(1:3,[size(CAA1,2),size(KAA3,2),size(WAA5,2)]);
+
+% there are double names in features(:,2) in most of them    
+proteins = readtable('protein_coding_genes_GRCh38.p12.txt');
+
+proteins_vec = ismember(features{:,2}, proteins{:,1});
+n=(features{:,2});
+[ii, jj, kk] = unique(n);
+double_names = ii(accumarray(kk, 1) > 1);
+lia= ismember(n,double_names);
+
+
+sc_no_dup = NaN(size(n));
+for g = 1:length(n)
+    if lia(g) < 1
+        sc_no_dup(g,1) = 1;
+    else
+        ind_tmp = strmatch(n(g),n,'exact');
+        ind_sum = sum(F_r1(ind_tmp,:),2);
+        cond = ind_sum(1)>ind_sum(2);
+        if cond >0 %means that the first has higher exp
+            sc_no_dup(ind_tmp(1),1) = 1;
+            sc_no_dup(ind_tmp(2),1) = 0;
+        else
+            sc_no_dup(ind_tmp(1),1) = 0;
+            sc_no_dup(ind_tmp(2),1) = 1;
+        end
+    end
+end
+
+% sc_no_dup is a vec without the duplicates (zeros)
+protein_no_dup = proteins_vec&logical(sc_no_dup);
+gene_names = n(protein_no_dup);
+    
+    
+singlets_mat_F_r1 = F_r1(protein_no_dup,:);
+
+% filter cells
+min_umi    = 500;
+cond_1     = sum(singlets_mat_F_r1)>min_umi; sum(cond_1)
+ribo_genes = startsWith(gene_names,'RPL')|startsWith(gene_names,'RPS');
+mito_genes = startsWith(gene_names,'MT-')|startsWith(gene_names,'MTRNR');
+cond_2     = sum(singlets_mat_F_r1(ribo_genes,:))./sum(singlets_mat_F_r1) < 0.20;
+cond_3     = sum(singlets_mat_F_r1(mito_genes,:))./sum(singlets_mat_F_r1) < 0.15;
+good_cells_F_r1 = (cond_1 & cond_2 & cond_3); sum(good_cells_F_r1)
+ribo_mito  = ribo_genes|mito_genes;
+
+good_singlets_mat_F_r1 = singlets_mat_F_r1(:,good_cells_F_r1);
+F_r1_vec = F_r1_vec_uf(good_cells_F_r1);
+save F_r1_raw.mat good_singlets_mat_F_r1 F_r1_vec gene_names;      
+end
+
+if F_r1_norm_ds_filt
+%% load data
+load cmap_color_blind.mat;
+load F_r1_raw.mat;
+load tx_colors.mat; % make this somewhere new in this script
+load macs_subtypes.mat; % make this somewhere new in this script
+%% downsample
+raw_ctrl = good_singlets_mat_F_r1(:,F_r1_vec == 1); %5551
+ctrl_ds_r1 = downsample(raw_ctrl',10)'; %556
+
+raw_ko = good_singlets_mat_F_r1(:,F_r1_vec == 2); %4687
+ko_ds_r1 = downsample(raw_ko',2)';
+
+raw_wt = good_singlets_mat_F_r1(:,F_r1_vec == 3); %369
+
+raw_mat_ds_r1 = [ctrl_ds_r1,ko_ds_r1,raw_wt];
+mat_vec_ds_r1 = repelem(1:3,[size(ctrl_ds_r1,2),size(ko_ds_r1,2),size(raw_wt,2)]);
+%% normalize
+mat_tpm_ds_r1 = median(sum(raw_mat_ds_r1))*bsxfun(@rdivide,raw_mat_ds_r1,sum(raw_mat_ds_r1));
+mat_log_ds_r1 = log10(1+mat_tpm_ds_r1);
+
+mat_label = {'control','KO','WT'};
+%% filter stromal cells 
+% pca and tsne
+[info_genes_r1d,info_genes_names_r1d] = info_genes(mat_tpm_ds_r1,2,2,gene_names);%505
+
+[coeff,score,~,~,explained,~] = pca(mat_log_ds_r1(info_genes_r1d,:)');
+
+% tsne
+no_dims       = 2;
+initial_dims  = 10;
+min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_r1d = mat_log_ds_r1(info_genes_r1d,:);
+% mappedY_r1d = tsne(Y_r1d',[], no_dims, initial_dims, perplexity);
+% save mappedY_r1d.mat mappedY_r1d;
+load mappedY_r1d.mat;
+
+macs_cluster_labels = {'HB','stromal','maternal'};
+figure;
+for f = 1:length(macs_cluster_labels)
+    subplot(2,3,f)
+    scatter(mappedY_r1d(:,1),mappedY_r1d(:,2),10,sum(mat_log_ds_r1(DE_genes_c(:,f),:)),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);title(macs_cluster_labels(f));
+    colormap(cmap_color_blind);
+end
+
+
+print -painters -depsc 'Fig_S5c_B_subtypes.pdf' 
+
+clust2 = cluster((linkage(pdist(mat_log_ds_r1(info_genes_r1d,:)'),'ward')),2);
+
+ca = brewermap(8,'Set2');ac = ca(8,:);
+cb = ca(1,:);
+c2 = vertcat(cb,ca);
+
+figure;
+scatter(mappedY_r1d(:,1),mappedY_r1d(:,2),20,clust2,'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(c2);
+print -painters -depsc 'Fig_S5c_B_first_remove.pdf' 
+
+% filter out stromal
+g = clust2 == 2;
+
+fr1_g_raw = raw_mat_ds_r1(:,g);
+fr1_g_tpm = mat_tpm_ds_r1(:,g);
+fr1_g_log = mat_log_ds_r1(:,g);
+fr1_g_vec = mat_vec_ds_r1(g);
+
+[info_genes_g,info_genes_names_g] = info_genes(fr1_g_tpm,2,2,gene_names);%371
+
+[coeff,score,~,~,explained,~] = pca(fr1_g_log(info_genes_g,:)');
+
+% tsne
+no_dims       = 2;
+initial_dims  = 10;
+min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_fr1g = fr1_g_log(info_genes_g,:);
+% mappedY_fr1g = tsne(Y_fr1g',[], no_dims, initial_dims, perplexity);
+% save mappedY_fr1g.mat mappedY_fr1g;
+load mappedY_fr1g.mat;
+
+figure;
+for f = 1:length(macs_cluster_labels)
+    subplot(2,3,f)
+    scatter(mappedY_fr1g(:,1),mappedY_fr1g(:,2),10,sum(fr1_g_log(DE_genes_c(:,f),:)),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);title(macs_cluster_labels(f));
+    colormap(cmap_color_blind);
+end
+print -painters -depsc 'Fig_S5c_B_subtypes_keep.pdf' 
+
+%% save data
+save hpm_F_r1_g.mat fr1_g_raw fr1_g_tpm fr1_g_log fr1_g_vec mappedY_fr1g gene_names;
+end
+
+if E_load % female fetus, placenta C
+% read in raw data
+C4H11 = csvread('filtered_feature_bc_matrix_C4H11.csv', 1, 1);
+K4H9 = csvread('filtered_feature_bc_matrix_K4H9.csv', 1, 1);
+G4H10 = csvread('filtered_feature_bc_matrix_G4H10.csv', 1, 1);
+
+features = readtable('features');
+    
+E = [C4H11,K4H9,G4H10];    
+E_vec_uf = repelem(1:3,[size(C4H11,2),size(K4H9,2),size(G4H10,2)]);
+
+% there are double names in features(:,2) in most of them    
+proteins = readtable('protein_coding_genes_GRCh38.p12.txt');
+
+proteins_vec = ismember(features{:,2}, proteins{:,1});
+n=(features{:,2});
+[ii, jj, kk] = unique(n);
+double_names = ii(accumarray(kk, 1) > 1);
+lia= ismember(n,double_names);
+
+sc_no_dup = NaN(size(n));
+for g = 1:length(n)
+    if lia(g) < 1
+        sc_no_dup(g,1) = 1;
+    else
+        ind_tmp = strmatch(n(g),n,'exact');
+        ind_sum = sum(E(ind_tmp,:),2);
+        cond = ind_sum(1)>ind_sum(2);
+        if cond >0 %means that the first has higher exp
+            sc_no_dup(ind_tmp(1),1) = 1;
+            sc_no_dup(ind_tmp(2),1) = 0;
+        else
+            sc_no_dup(ind_tmp(1),1) = 0;
+            sc_no_dup(ind_tmp(2),1) = 1;
+        end
+    end
+end
+
+% sc_no_dup is a vec without the duplicates (zeros)
+protein_no_dup = proteins_vec&logical(sc_no_dup);
+gene_names = n(protein_no_dup);
+    
+    
+singlets_mat_E = E(protein_no_dup,:);
+
+% filter cells
+min_umi    = 500;
+cond_1     = sum(singlets_mat_E)>min_umi; sum(cond_1)
+ribo_genes = startsWith(gene_names,'RPL')|startsWith(gene_names,'RPS');
+mito_genes = startsWith(gene_names,'MT-')|startsWith(gene_names,'MTRNR');
+cond_2     = sum(singlets_mat_E(ribo_genes,:))./sum(singlets_mat_E) < 0.20;
+cond_3     = sum(singlets_mat_E(mito_genes,:))./sum(singlets_mat_E) < 0.15;
+good_cells_E = (cond_1 & cond_2 & cond_3); sum(good_cells_E)
+ribo_mito  = ribo_genes|mito_genes;
+
+good_singlets_mat_E = singlets_mat_E(:,good_cells_E);
+E_vec = E_vec_uf(good_cells_E);
+save E_raw.mat good_singlets_mat_E E_vec gene_names;       
+end
+
+if E_norm_ds_filt
+%% load data
+load cmap_color_blind.mat;
+load E_raw.mat;
+load tx_colors.mat;
+load macs_subtypes.mat;
+%% downsample
+raw_ctrl = good_singlets_mat_E(:,E_vec == 1); %2568
+ctrl_ds_E = downsample(raw_ctrl',3)'; %856
+
+raw_ko = good_singlets_mat_E(:,E_vec == 2); %3731
+ko_ds_E = downsample(raw_ko',4)'; %933
+
+raw_wt = good_singlets_mat_E(:,E_vec == 3); %1002
+
+raw_mat_E = [ctrl_ds_E,ko_ds_E,raw_wt];
+mat_vec_E = repelem(1:3,[size(ctrl_ds_E,2),size(ko_ds_E,2),size(raw_wt,2)]);
+%% normalize
+mat_tpm_ds_E = median(sum(raw_mat_E))*bsxfun(@rdivide,raw_mat_E,sum(raw_mat_E));
+mat_log_ds_E = log10(1+mat_tpm_ds_E);
+
+mat_label = {'control','KO','WT'};
+%% filter stromal cells
+% pca and tsne
+[info_genes_ed,info_genes_names_ed] = info_genes(mat_tpm_ds_E,2,2,gene_names);%480
+
+[coeff,score,~,~,explained,~] = pca(mat_log_ds_E(info_genes_ed,:)');
+
+% tsne
+no_dims       = 2;
+initial_dims  = 10;
+min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_ed = mat_log_ds_E(info_genes_ed,:);
+% mappedY_ed = tsne(Y_ed',[], no_dims, initial_dims, perplexity);
+% save mappedY_ed.mat mappedY_ed;
+load mappedY_ed.mat;
+
+macs_cluster_labels = {'HB','stromal','maternal'};
+figure;
+for f = 1:length(macs_cluster_labels)
+    subplot(2,3,f)
+    scatter(mappedY_ed(:,1),mappedY_ed(:,2),10,sum(mat_log_ds_E(DE_genes_c(:,f),:)),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);title(macs_cluster_labels(f));
+    colormap(cmap_color_blind);
+    
+end
+
+print -painters -depsc 'Fig_S5c_C_subtypes.pdf' 
+
+clust6 = cluster((linkage(pdist(mat_log_ds_E(info_genes_ed,:)'),'ward')),6);
+
+% could come back and it would probably be more correct to do it in two
+% stages
+rm = clust6 == 6|clust6 == 2;
+
+figure;
+scatter(mappedY_ed(:,1),mappedY_ed(:,2),10,rm,'filled');
+
+ca = brewermap(8,'Set2');ac = ca(8,:);
+cb = ca(1,:);
+c2 = vertcat(cb,ca);
+
+figure;
+scatter(mappedY_ed(:,1),mappedY_ed(:,2),20,rm,'filled');
+set(gca,'xtick',[]);set(gca,'ytick',[]);
+colormap(flip(c2));
+print -painters -depsc 'Fig_S5c_C_first_remove.pdf' 
+
+
+g = ~rm;
+
+e_g_raw = raw_mat_E(:,g);
+e_g_tpm = mat_tpm_ds_E(:,g);
+e_g_log = mat_log_ds_E(:,g);
+e_g_vec = mat_vec_E(g);
+
+[info_genes_eg,info_genes_names_eg] = info_genes(e_g_tpm,2,2,gene_names);%427
+
+[coeff,score,~,~,explained,~] = pca(e_g_log(info_genes_eg,:)');
+
+% tsne
+no_dims       = 2;
+initial_dims  = 10;
+% min(find(cumsum(explained)>=90));
+perplexity    = 50;
+
+Y_eg = e_g_log(info_genes_eg,:);
+% mappedY_eg = tsne(Y_eg',[], no_dims, initial_dims, perplexity);
+% save mappedY_eg.mat mappedY_eg;
+load mappedY_eg.mat;
+
+figure;
+for f = 1:length(macs_cluster_labels)
+    subplot(2,3,f)
+    scatter(mappedY_eg(:,1),mappedY_eg(:,2),10,sum(e_g_log(DE_genes_c(:,f),:)),'filled');
+    set(gca,'xtick',[]);set(gca,'ytick',[]);title(macs_cluster_labels(f));
+    colormap(cmap_color_blind);
+end
+
+print -painters -depsc 'Fig_S5c_C_subtypes_keep.pdf' 
+
+%% save data
+save hpm_E_g.mat e_g_raw e_g_tpm e_g_log e_g_vec mappedY_eg gene_names;
+end
